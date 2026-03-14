@@ -1,154 +1,133 @@
 # EpiconUI
 
-Browser-based prototype for a four-panel research workspace.
+Browser-based workspace for uploading papers, chunking them into structured assets, indexing them into Postgres/pgvector, and connecting those papers to LLM and R-based analysis workflows.
 
-## Files
+This project is designed to work well alongside the local [phonto](https://github.com/epiconnector/phonto) package for NHANES-side R access and analysis.
 
-- `index.html` contains the app structure.
-- `styles.css` defines the three-column layout and panel styling.
-- `app.js` adds lightweight prompt and context interactions.
-- `pdf_tools.py` extracts PDF markdown, captions, tables, figures, and section-aware chunks.
-- `process_pdf.py` is the CLI entrypoint for the PDF pipeline.
-- `project_store.py` manages the `~/.EpiMind/Projects/<project>/papers/<paper>/...` storage layout.
-- `ingest_project_pdf.py` copies a PDF into a project and runs the extraction pipeline there.
-- `server.py` serves the browser UI and API endpoints for project creation and PDF upload.
-- `config_store.py` stores LLM connection settings server-side under `~/.EpiMind/config`.
-- `llm_client.py` calls an OpenAI-compatible `/chat/completions` endpoint.
-- `embedding_client.py` calls an OpenAI-compatible `/embeddings` endpoint.
-- `rag_config.py` resolves Postgres and embedding settings for the RAG index.
-- `rag_store.py` creates the pgvector schema, indexes paper chunks, and runs filtered retrieval.
-- `init_rag_db.py`, `index_rag.py`, and `search_rag.py` are CLI entrypoints for the RAG workflow.
-- `docker-compose.pgvector.yml` starts a local pgvector-backed Postgres container.
+## Main Files
 
-## Run
+- `index.html`, `styles.css`, `app.js`: browser UI
+- `server.py`: local web server and API endpoints
+- `pdf_tools.py`: PDF to markdown/captions/tables/figures/chunks
+- `project_store.py`: `~/.EpiMind` project and paper layout
+- `rag_store.py`: Postgres schema creation, indexing, and retrieval
+- `rag_config.py`: DB and embedding runtime config
+- `embedding_client.py`: OpenAI-compatible embeddings client
+- `init_rag_db.py`, `index_rag.py`, `search_rag.py`: RAG CLI tools
 
-Start the local server:
+## Install
 
 ```bash
-python3 server.py
-```
-
-Then open `http://127.0.0.1:8765` in a browser.
-
-The top bar can either open an existing project discovered under `~/.EpiMind/Projects` or create a new one.
-
-## PDF Tools
-
-Install the PDF dependencies in `requirements-pdf-tools.txt`, then run:
-
-```bash
-python3 process_pdf.py /path/to/paper.pdf --output-dir ./output/paper
-```
-
-To store papers inside the project-scoped hidden directory structure:
-
-```bash
-python3 ingest_project_pdf.py "My Project" /path/to/paper.pdf
-```
-
-The browser UI uses the same ingest pipeline through `POST /api/upload`.
-
-## RAG Database
-
-Install the database dependency:
-
-```bash
+python3 -m pip install -r requirements-pdf-tools.txt
 python3 -m pip install -r requirements-rag.txt
 ```
 
-Start a local pgvector Postgres container:
+## Environment Variables
+
+These are the important variables for this project.
+
+### Postgres
+
+If you are using the existing `EpiMind` database defaults, these are the values:
 
 ```bash
-export EPIMIND_PGPASSWORD="postgres"
-docker compose -f docker-compose.pgvector.yml up -d
+export EPIMIND_PGHOST=127.0.0.1
+export EPIMIND_PGPORT=5432
+export EPIMIND_PGUSER=sa
+export EPIMIND_PGPASSWORD=NHAN35
+export EPIMIND_PGDATABASE=NhanesLandingZone
+export EPIMIND_PGSCHEMA=epimind
 ```
 
-Environment variables used by the RAG pipeline:
+Notes:
 
-- `EPIMIND_PGHOST` default `127.0.0.1`
-- `EPIMIND_PGPORT` default `5432`
-- `EPIMIND_PGUSER` default `postgres`
-- `EPIMIND_PGPASSWORD` required for password-authenticated Postgres
-- `EPIMIND_PGDATABASE` default `epimind`
-- `EPIMIND_PGSCHEMA` default `epimind`
-- `OPENAI_API_KEY` or `OPENAI_EMBEDDING_API_KEY` for embeddings
-- `OPENAI_EMBEDDING_MODEL` default `text-embedding-3-small`
-- `OPENAI_EMBEDDING_DIMENSIONS` default `1536`
+- `EPIMIND_PGDATABASE` should usually stay `NhanesLandingZone`
+- `EPIMIND_PGSCHEMA` should stay `epimind` so the paper/RAG tables remain separate from the NHANES tables
 
-Initialize the schema:
+### Embeddings
+
+```bash
+export OPENAI_API_KEY="your-key"
+export OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+export OPENAI_EMBEDDING_DIMENSIONS=1536
+```
+
+Optional overrides:
+
+```bash
+export OPENAI_EMBEDDING_API_KEY="your-key"
+export OPENAI_EMBEDDING_BASE_URL="https://api.openai.com/v1"
+export OPENAI_EMBEDDING_BATCH_SIZE=32
+export OPENAI_EMBEDDING_TIMEOUT=180
+```
+
+### Chat / LLM UI
+
+The browser UI can also use:
+
+```bash
+export OPENAI_API_KEY="your-key"
+export OPENAI_BASE_URL="https://api.openai.com/v1"
+export OPENAI_MODEL="gpt-4o-mini"
+```
+
+### Optional Upload Auto-Indexing
+
+If you want paper uploads to index into Postgres immediately after ingestion:
+
+```bash
+export EPIMIND_AUTO_INDEX_RAG=1
+```
+
+## Start The UI
+
+```bash
+cd /Users/robert/Projects/Epiconnector/EpiconUI
+python3 server.py
+```
+
+Then open [http://127.0.0.1:8765](http://127.0.0.1:8765).
+
+## Initialize The Database
+
+This creates the `epimind` schema and the project/paper/chunk/embedding tables inside `NhanesLandingZone`.
 
 ```bash
 python3 init_rag_db.py
 ```
 
-Index one ingested paper:
+## Index A Paper
+
+From the UI, select a paper and use `Embed Paper`.
+
+From the command line:
 
 ```bash
 python3 index_rag.py "My Project" "cobaltpaper"
 ```
 
-Search the vector store, optionally filtered by project and paper:
+## Search The Vector Store
 
 ```bash
 python3 search_rag.py "What are the main exposure outcomes?" --project "My Project" --paper "cobaltpaper"
 ```
 
-If you want uploads to index automatically after ingestion, start the web server with:
+## Project Storage
 
-```bash
-export EPIMIND_AUTO_INDEX_RAG=1
-python3 server.py
-```
-
-## LLM Connection
-
-The middle panel can be configured with:
-
-- API base URL
-- model name
-- API key
-- optional system prompt
-
-These settings are stored server-side in `~/.EpiMind/config/llm.json` with restrictive file permissions when possible, instead of storing secrets in browser local storage.
-
-The pipeline writes:
-
-- paper markdown
-- captions as both markdown and JSON
-- extracted tables as markdown plus a JSON manifest
-- extracted figures as image files plus a JSON manifest
-- section-preserving equal-size chunks as JSONL
-
-## Project Layout
-
-Each project lives under `~/.EpiMind/Projects/<project-slug>`.
+Projects are stored under `~/.EpiMind/Projects/<project-slug>`.
 Each paper lives under `~/.EpiMind/Projects/<project-slug>/papers/<paper-slug>`.
 
-Inside each paper directory:
+When a paper is indexed into Postgres, `EpiconUI` also writes:
 
-- `paper/<original-file>.pdf`
-- `chunks/chunks.jsonl`
-- `markdown/<paper-slug>.md`
-- `captions/captions.json`
-- `figures/`
-- `tables/`
-- `metadata/`
-- `manifest.json`
+- `~/.EpiMind/config/rag.json`
+- `metadata/vector_index.json`
+- `paper.json["rag"]`
+- `project.json["rag"]`
 
-When a paper is indexed into Postgres, the pipeline also writes:
+## Additional Documentation
 
-- `~/.EpiMind/config/rag.json` with non-secret database and embedding runtime settings
-- `metadata/vector_index.json` with the Postgres schema, table names, project ID, paper ID, chunk count, and embedding model
-- `paper.json["rag"]` and `project.json["rag"]` summaries so later R or Python code can discover the DB records directly from the project folders
-
-## Database Layout
-
-The pgvector schema mirrors the on-disk project hierarchy:
-
-- `epimind.epimind_registry`: root workspace record for the local `~/.EpiMind` installation
-- `epimind.projects`: one row per project
-- `epimind.papers`: one row per paper inside a project
-- `epimind.paper_assets`: filesystem artifacts such as `paper/`, `chunks/chunks.jsonl`, `manifest.json`, and figure/table metadata
-- `epimind.paper_sections`: ordered section records derived from the chunk stream
-- `epimind.paper_chunks`: chunk text and markdown payloads
-- `epimind.chunk_embeddings`: pgvector embeddings keyed one-to-one to `paper_chunks`
+- [Local Filesystem Layout](/Users/robert/Projects/Epiconnector/EpiconUI/documentation/local-filesystem.md)
+- [NhanesLandingZone / epimind Schema](/Users/robert/Projects/Epiconnector/EpiconUI/documentation/nhaneslandingzone-schema.md)
+- [Database Checks And SQL](/Users/robert/Projects/Epiconnector/EpiconUI/documentation/database-checks.md)
+- [R And dplyr Examples](/Users/robert/Projects/Epiconnector/EpiconUI/documentation/r-dplyr-access.md)
+- [phonto And DB Access](/Users/robert/Projects/Epiconnector/EpiconUI/documentation/phonto-db-access.md)
