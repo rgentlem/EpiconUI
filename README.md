@@ -12,6 +12,8 @@ Browser-based prototype for a four-panel research workspace.
 - `project_store.py` manages the `~/.EpiMind/Projects/<project>/papers/<paper>/...` storage layout.
 - `ingest_project_pdf.py` copies a PDF into a project and runs the extraction pipeline there.
 - `server.py` serves the browser UI and API endpoints for project creation and PDF upload.
+- `config_store.py` stores LLM connection settings server-side under `~/.EpiMind/config`.
+- `llm_client.py` calls an OpenAI-compatible `/chat/completions` endpoint.
 
 ## Run
 
@@ -22,6 +24,8 @@ python3 server.py
 ```
 
 Then open `http://127.0.0.1:8765` in a browser.
+
+The top bar can either open an existing project discovered under `~/.EpiMind/Projects` or create a new one.
 
 ## PDF Tools
 
@@ -38,6 +42,17 @@ python3 ingest_project_pdf.py "My Project" /path/to/paper.pdf
 ```
 
 The browser UI uses the same ingest pipeline through `POST /api/upload`.
+
+## LLM Connection
+
+The middle panel can be configured with:
+
+- API base URL
+- model name
+- API key
+- optional system prompt
+
+These settings are stored server-side in `~/.EpiMind/config/llm.json` with restrictive file permissions when possible, instead of storing secrets in browser local storage.
 
 The pipeline writes:
 

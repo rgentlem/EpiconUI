@@ -9,38 +9,34 @@
   <body>
     <div class="app-shell">
       <header class="app-header">
-        <div>
-          <p class="eyebrow">Document-to-analysis workspace</p>
-          <h1>EpiconUI</h1>
+        <h1>EpiconUI</h1>
+        <div class="header-project">
+          <span class="section-label">Active Project</span>
+          <strong id="header-project-name">None selected</strong>
         </div>
-        <div class="header-status">
-          <span class="status-chip">Browser-based</span>
-          <span class="status-chip">4 active panels</span>
-          <span class="status-chip">R + LLM linked</span>
-        </div>
+        <div class="header-spacer" aria-hidden="true"></div>
       </header>
 
       <section class="project-bar panel">
         <div class="project-bar-inner">
           <form class="project-form" id="project-form">
-            <label for="project-name" class="section-label">Project name</label>
-            <div class="project-actions">
+            <div class="project-picker">
+              <label for="project-select" class="section-label">Open project</label>
+              <select id="project-select" name="project-select">
+                <option value="">Choose existing project</option>
+              </select>
+            </div>
+            <div class="project-actions compact-actions">
               <input
                 id="project-name"
                 name="project-name"
                 type="text"
-                placeholder="Enter a project name"
+                placeholder="Or create new project"
                 autocomplete="off"
               />
-              <button type="submit" class="primary-button">Start Project</button>
+              <button type="submit" class="primary-button">Open</button>
             </div>
           </form>
-          <div class="project-summary" id="project-summary">
-            <p class="section-label">Storage root</p>
-            <strong>~/.EpiMind/Projects</strong>
-            <span class="project-path" id="project-root-display">No project selected</span>
-            <span class="project-status" id="project-status">Backend not connected yet</span>
-          </div>
         </div>
       </section>
 
@@ -48,7 +44,6 @@
         <section class="panel document-panel">
           <div class="panel-heading">
             <div>
-              <p class="section-label">Panel 1</p>
               <h2>Paper Inputs</h2>
             </div>
             <div class="upload-control">
@@ -143,60 +138,75 @@
 
         <section class="panel llm-panel">
           <div class="panel-heading">
-            <div>
-              <p class="section-label">Panel 2</p>
-              <h2>LLM Research Console</h2>
-            </div>
-            <div class="connection-badge">
-              <span class="pulse"></span>
-              Ready for ChatGPT or API connector
-            </div>
-          </div>
-
-          <div class="integration-strip">
-            <div class="integration-card">
-              <span class="integration-label">Context source</span>
-              <strong>Document chunks + linked data</strong>
-            </div>
-            <div class="integration-card">
-              <span class="integration-label">Prompt target</span>
-              <strong>OpenAI / compatible LLM</strong>
-            </div>
-            <div class="integration-card">
-              <span class="integration-label">Output path</span>
-              <strong>Tiles, notes, RStudio handoff</strong>
+            <h2>LLM Research Console</h2>
+            <div class="llm-heading-actions">
+              <button type="button" class="ghost-button" id="toggle-llm-config">LLM Settings</button>
             </div>
           </div>
 
           <div class="chat-shell">
+            <form class="llm-config-card" id="llm-config-form">
+              <div class="llm-config-header">
+                <div>
+                  <p class="section-label">Connection</p>
+                  <h3>LLM credentials</h3>
+                </div>
+                <span class="llm-config-status" id="llm-config-status">
+                  Stored on this machine under ~/.EpiMind/config
+                </span>
+              </div>
+              <div class="llm-config-grid">
+                <label class="field-group">
+                  <span class="section-label">API base URL</span>
+                  <input
+                    id="llm-base-url"
+                    name="llm-base-url"
+                    type="text"
+                    placeholder="https://api.openai.com/v1"
+                    autocomplete="off"
+                  />
+                </label>
+                <label class="field-group">
+                  <span class="section-label">Model</span>
+                  <input
+                    id="llm-model"
+                    name="llm-model"
+                    type="text"
+                    placeholder="gpt-4o-mini"
+                    autocomplete="off"
+                  />
+                </label>
+                <label class="field-group field-group-wide">
+                  <span class="section-label">API key</span>
+                  <input
+                    id="llm-api-key"
+                    name="llm-api-key"
+                    type="password"
+                    placeholder="Stored server-side; leave blank to keep current key"
+                    autocomplete="off"
+                  />
+                </label>
+                <label class="field-group field-group-wide">
+                  <span class="section-label">System prompt</span>
+                  <textarea
+                    id="llm-system-prompt"
+                    name="llm-system-prompt"
+                    rows="3"
+                    placeholder="Optional default system instruction for the research console"
+                  ></textarea>
+                </label>
+              </div>
+              <div class="prompt-actions">
+                <button type="submit" class="primary-button">Save connection</button>
+                <button type="button" class="secondary-button" id="clear-llm-config">Clear stored key</button>
+              </div>
+            </form>
+
             <div class="chat-thread">
-              <div class="message message-system">
-                <span class="message-role">System</span>
-                <p>
-                  You are working with parsed paper sections, chunk references,
-                  and connected epidemiology datasets.
-                </p>
-              </div>
-              <div class="message message-user">
-                <span class="message-role">Researcher</span>
-                <p>
-                  Compare the exposure variables in chunk 027 with the linked
-                  dataset schema and suggest an R modeling path.
-                </p>
-              </div>
-              <div class="message message-assistant">
-                <span class="message-role">Assistant</span>
-                <p>
-                  The chunk describes three exposure measures that map to the
-                  `pm25_avg`, `lead_level`, and `distance_to_source` columns.
-                  A first-pass model could begin with a multivariable linear
-                  regression, then branch to stratified sensitivity checks in
-                  RStudio.
-                </p>
-              </div>
+              <div class="chat-empty" id="chat-empty">Send a prompt to start the conversation.</div>
             </div>
 
-            <form class="prompt-box">
+            <form class="prompt-box" id="prompt-form">
               <label for="prompt" class="section-label">Prompt workspace</label>
               <textarea
                 id="prompt"
@@ -208,7 +218,7 @@
                 <button type="button" class="secondary-button" id="inject-context">
                   Insert selected chunks
                 </button>
-                <button type="button" class="primary-button" id="send-prompt">
+                <button type="submit" class="primary-button" id="send-prompt">
                   Send to model
                 </button>
               </div>
@@ -219,10 +229,7 @@
         <div class="right-column">
           <section class="panel output-panel">
             <div class="panel-heading">
-              <div>
-                <p class="section-label">Panel 3</p>
-                <h2>Output Window</h2>
-              </div>
+              <h2>Output Window</h2>
               <button class="ghost-button">Create Tile</button>
             </div>
 
@@ -252,10 +259,7 @@
 
           <section class="panel rstudio-panel">
             <div class="panel-heading">
-              <div>
-                <p class="section-label">Panel 4</p>
-                <h2>RStudio Workspace</h2>
-              </div>
+              <h2>RStudio Workspace</h2>
               <button class="ghost-button">Launch Session</button>
             </div>
 

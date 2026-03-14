@@ -48,6 +48,23 @@ def projects_root(base_dir: str | Path | None = None) -> Path:
     return root
 
 
+def list_projects(base_dir: str | Path | None = None) -> list[dict[str, str]]:
+    root = projects_root(base_dir)
+    projects: list[dict[str, str]] = []
+    for child in sorted(root.iterdir()):
+        if not child.is_dir():
+            continue
+        metadata = read_json(child / "project.json", {})
+        projects.append(
+            {
+                "project_name": str(metadata.get("project_name") or child.name),
+                "project_slug": str(metadata.get("project_slug") or child.name),
+                "root_dir": str(child),
+            }
+        )
+    return projects
+
+
 def now_iso() -> str:
     return datetime.now(tz=UTC).replace(microsecond=0).isoformat()
 

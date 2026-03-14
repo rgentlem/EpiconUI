@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from project_store import ensure_paper_paths, ensure_project
+from project_store import ensure_paper_paths, ensure_project, list_projects
 
 
 class ProjectStoreTests(unittest.TestCase):
@@ -25,6 +25,15 @@ class ProjectStoreTests(unittest.TestCase):
             self.assertTrue(paper.paper_dir.exists())
             self.assertTrue(paper.chunks_dir.exists())
             self.assertEqual(paper.source_pdf_path.name, "cohort-study.pdf")
+
+    def test_list_projects_returns_created_projects(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            ensure_project("Exposure Mapping", base_dir=tmp_dir)
+            ensure_project("Air Quality", base_dir=tmp_dir)
+
+            projects = list_projects(tmp_dir)
+
+            self.assertEqual([project["project_slug"] for project in projects], ["air-quality", "exposure-mapping"])
 
 
 if __name__ == "__main__":

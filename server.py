@@ -1,17 +1,49 @@
 from __future__ import annotations
 
 import argparse
-import cgi
 import json
 import tempfile
+from email.parser import BytesParser
+from email.policy import default
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from project_store import ensure_project, ingest_pdf_to_project, read_json
+from config_store import clear_llm_config, llm_config_summary, load_llm_config, save_llm_config
+from llm_client import create_chat_completion
+from project_store import ensure_project, ingest_pdf_to_project, list_projects, read_json
 
 APP_ROOT = Path(__file__).resolve().parent
+
+
+def parse_multipart_form_data(content_type: str, body: bytes) -> dict[str, list[dict[str, str | bytes]]]:
+    if not content_type.startswith("multipart/form-data"):
+        raise ValueError("Expected multipart/form-data content type.")
+
+    header_block = f"Content-Type: {content_type}\r\nMIME-Version: 1.0\r\n\r\n".encode("utf-8")
+    message = BytesParser(policy=default).parsebytes(header_block + body)
+
+    fields: dict[str, list[dict[str, str | bytes]]] = {}
+    for part in message.iter_parts():
+        disposition = part.get_content_disposition()
+        if disposition != "form-data":
+            continue
+
+        name = part.get_param("name", header="content-disposition")
+        filename = part.get_filename()
+        content = part.get_payload(decode=True) or b""
+        if not name:
+            continue
+
+        fields.setdefault(name, []).append(
+            {
+                "filename": filename or "",
+                "value": content.decode("utf-8", errors="replace") if not filename else "",
+                "content": content,
+            }
+        )
+    return fields
 
 
 def safe_upload_name(filename: str) -> str:
@@ -35,6 +67,45 @@ def project_payload(project_name: str, base_dir: str | Path | None = None) -> di
     }
 
 
+def paper_record(project_name: str, paper_slug: str, base_dir: str | Path | None = None) -> dict | None:
+    project = ensure_project(project_name, base_dir=base_dir)
+    metadata = read_json(project.metadata_path, {})
+    for item in metadata.get("papers", []):
+        if item.get("paper_slug") == paper_slug:
+            return item
+    return None
+
+
+def load_paper_context(project_name: str, paper_slug: str, base_dir: str | Path | None = None) -> str:
+    record = paper_record(project_name, paper_slug, base_dir=base_dir)
+    if not record:
+        return ""
+
+    manifest = record.get("manifest", {})
+    markdown_path = Path(manifest.get("paper_markdown", ""))
+    chunks_path = Path(manifest.get("chunks_jsonl", ""))
+
+    sections: list[str] = []
+    if markdown_path.exists():
+        markdown_text = markdown_path.read_text(encoding="utf-8")
+        excerpt = markdown_text[:5000].strip()
+        if excerpt:
+            sections.append(f"Paper markdown excerpt:\n{excerpt}")
+
+    if chunks_path.exists():
+        chunk_lines = chunks_path.read_text(encoding="utf-8").splitlines()[:4]
+        chunk_texts: list[str] = []
+        for line in chunk_lines:
+            payload = json.loads(line)
+            chunk_texts.append(
+                f"[{payload.get('section', 'document')} chunk {payload.get('chunk_index', 1)}] {payload.get('text', '')}"
+            )
+        if chunk_texts:
+            sections.append("Chunk excerpts:\n" + "\n\n".join(chunk_texts))
+
+    return "\n\n".join(part for part in sections if part.strip())
+
+
 class EpiMindHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, directory: str | None = None, base_dir: str | Path | None = None, **kwargs):
         self.base_dir = base_dir
@@ -55,6 +126,14 @@ class EpiMindHandler(SimpleHTTPRequestHandler):
             self.send_json(project_payload(project_name, base_dir=self.base_dir))
             return
 
+        if parsed.path == "/api/projects":
+            self.send_json({"projects": list_projects(self.base_dir)})
+            return
+
+        if parsed.path == "/api/llm/config":
+            self.send_json(llm_config_summary(self.base_dir))
+            return
+
         if parsed.path == "/":
             self.path = "/index.html"
         super().do_GET()
@@ -69,12 +148,26 @@ class EpiMindHandler(SimpleHTTPRequestHandler):
             self.handle_upload()
             return
 
+        if parsed.path == "/api/llm/config":
+            self.handle_llm_config_upsert()
+            return
+
+        if parsed.path == "/api/chat":
+            self.handle_chat()
+            return
+
+        self.send_json({"error": "Not found."}, status=HTTPStatus.NOT_FOUND)
+
+    def do_DELETE(self) -> None:
+        parsed = urlparse(self.path)
+        if parsed.path == "/api/llm/config":
+            clear_llm_config(self.base_dir)
+            self.send_json({"ok": True})
+            return
         self.send_json({"error": "Not found."}, status=HTTPStatus.NOT_FOUND)
 
     def handle_project_create(self) -> None:
-        length = int(self.headers.get("Content-Length", "0"))
-        raw = self.rfile.read(length) if length else b"{}"
-        payload = json.loads(raw.decode("utf-8") or "{}")
+        payload = self.read_json_body()
         project_name = str(payload.get("project_name", "")).strip()
         if not project_name:
             self.send_json({"error": "Project name is required."}, status=HTTPStatus.BAD_REQUEST)
@@ -82,33 +175,110 @@ class EpiMindHandler(SimpleHTTPRequestHandler):
 
         self.send_json(project_payload(project_name, base_dir=self.base_dir))
 
-    def handle_upload(self) -> None:
-        form = cgi.FieldStorage(
-            fp=self.rfile,
-            headers=self.headers,
-            environ={
-                "REQUEST_METHOD": "POST",
-                "CONTENT_TYPE": self.headers.get("Content-Type", ""),
-            },
+    def read_json_body(self) -> dict:
+        length = int(self.headers.get("Content-Length", "0"))
+        raw = self.rfile.read(length) if length else b"{}"
+        return json.loads(raw.decode("utf-8") or "{}")
+
+    def handle_llm_config_upsert(self) -> None:
+        payload = self.read_json_body()
+        try:
+            summary = save_llm_config(
+                base_url=str(payload.get("base_url", "")),
+                model=str(payload.get("model", "")),
+                api_key=str(payload.get("api_key", "")),
+                system_prompt=str(payload.get("system_prompt", "")),
+                base_dir=self.base_dir,
+            )
+        except ValueError as exc:
+            self.send_json({"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+            return
+        self.send_json(summary)
+
+    def handle_chat(self) -> None:
+        payload = self.read_json_body()
+        message = str(payload.get("message", "")).strip()
+        project_name = str(payload.get("project_name", "")).strip()
+        paper_slug = str(payload.get("paper_slug", "")).strip()
+
+        if not message:
+            self.send_json({"error": "Message is required."}, status=HTTPStatus.BAD_REQUEST)
+            return
+
+        config = load_llm_config(self.base_dir)
+        if not config["configured"]:
+            self.send_json(
+                {"error": "LLM connection is not configured yet. Save the API URL, model, and API key first."},
+                status=HTTPStatus.BAD_REQUEST,
+            )
+            return
+
+        base_system_prompt = config.get("system_prompt") or (
+            "You are assisting inside EpiconUI. Use the supplied project and paper context when it is available."
+        )
+        messages = [{"role": "system", "content": base_system_prompt}]
+
+        if project_name and paper_slug:
+            context = load_paper_context(project_name, paper_slug, base_dir=self.base_dir)
+            if context:
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": (
+                            f"Selected project: {project_name}\nSelected paper: {paper_slug}\n\n{context}"
+                        ),
+                    }
+                )
+
+        messages.append({"role": "user", "content": message})
+
+        try:
+            result = create_chat_completion(
+                base_url=config["base_url"],
+                api_key=config["api_key"],
+                model=config["model"],
+                messages=messages,
+            )
+        except RuntimeError as exc:
+            self.send_json({"error": str(exc)}, status=HTTPStatus.BAD_GATEWAY)
+            return
+
+        self.send_json(
+            {
+                "answer": result["content"],
+                "model": config["model"],
+                "paper_slug": paper_slug,
+            }
         )
 
-        project_name = str(form.getfirst("project_name", "")).strip()
-        file_item = form["file"] if "file" in form else None
+    def handle_upload(self) -> None:
+        content_type = self.headers.get("Content-Type", "")
+        length = int(self.headers.get("Content-Length", "0"))
+        body = self.rfile.read(length) if length else b""
+
+        try:
+            form = parse_multipart_form_data(content_type, body)
+        except ValueError as exc:
+            self.send_json({"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+            return
+
+        project_name = str((form.get("project_name") or [{"value": ""}])[0]["value"]).strip()
+        file_item = (form.get("file") or [None])[0]
 
         if not project_name:
             self.send_json({"error": "Project name is required."}, status=HTTPStatus.BAD_REQUEST)
             return
-        if file_item is None or not getattr(file_item, "filename", ""):
+        if file_item is None or not str(file_item.get("filename", "")).strip():
             self.send_json({"error": "PDF upload is required."}, status=HTTPStatus.BAD_REQUEST)
             return
 
-        upload_name = safe_upload_name(file_item.filename)
+        upload_name = safe_upload_name(str(file_item["filename"]))
         temp_path: Path | None = None
         temp_dir: tempfile.TemporaryDirectory[str] | None = None
         try:
             temp_dir = tempfile.TemporaryDirectory()
             temp_path = Path(temp_dir.name) / upload_name
-            temp_path.write_bytes(file_item.file.read())
+            temp_path.write_bytes(bytes(file_item["content"]))
 
             result = ingest_pdf_to_project(
                 project_name,
