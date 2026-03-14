@@ -20,17 +20,63 @@
         </div>
       </header>
 
+      <section class="project-bar panel">
+        <div class="project-bar-inner">
+          <form class="project-form" id="project-form">
+            <label for="project-name" class="section-label">Project name</label>
+            <div class="project-actions">
+              <input
+                id="project-name"
+                name="project-name"
+                type="text"
+                placeholder="Enter a project name"
+                autocomplete="off"
+              />
+              <button type="submit" class="primary-button">Start Project</button>
+            </div>
+          </form>
+          <div class="project-summary" id="project-summary">
+            <p class="section-label">Storage root</p>
+            <strong>~/.EpiMind/Projects</strong>
+            <span class="project-path" id="project-root-display">No project selected</span>
+            <span class="project-status" id="project-status">Backend not connected yet</span>
+          </div>
+        </div>
+      </section>
+
       <main class="workspace-grid">
         <section class="panel document-panel">
           <div class="panel-heading">
             <div>
               <p class="section-label">Panel 1</p>
-              <h2>Document Reader</h2>
+              <h2>Paper Inputs</h2>
             </div>
-            <button class="ghost-button">Import Papers</button>
+            <div class="upload-control">
+              <input id="paper-upload" type="file" accept=".pdf,application/pdf" hidden />
+              <button class="ghost-button" id="import-papers" type="button">Import Papers</button>
+            </div>
           </div>
 
           <div class="panel-scroll">
+            <div class="paper-tiles-section input-paper-section">
+              <div class="paper-tiles-header">
+                <div>
+                  <p class="section-label">Project papers</p>
+                  <h3>Uploaded PDFs</h3>
+                </div>
+                <span class="paper-count" id="paper-count">0 papers</span>
+              </div>
+              <div class="paper-tile-grid" id="paper-tile-grid"></div>
+              <article class="paper-detail-card" id="paper-detail-card">
+                <p class="section-label">Paper contents</p>
+                <h3>No paper selected</h3>
+                <p>
+                  Upload a PDF after naming the project. A tile will be created
+                  here and selecting it will show the generated paper assets.
+                </p>
+              </article>
+            </div>
+
             <article class="feature-card">
               <p class="card-kicker">Active source</p>
               <h3>Environmental exposure review</h3>
