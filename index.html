@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EpiconUI Workspace</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">Document-to-analysis workspace</p>
+          <h1>EpiconUI</h1>
+        </div>
+        <div class="header-status">
+          <span class="status-chip">Browser-based</span>
+          <span class="status-chip">4 active panels</span>
+          <span class="status-chip">R + LLM linked</span>
+        </div>
+      </header>
+
+      <main class="workspace-grid">
+        <section class="panel document-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="section-label">Panel 1</p>
+              <h2>Document Reader</h2>
+            </div>
+            <button class="ghost-button">Import Papers</button>
+          </div>
+
+          <div class="panel-scroll">
+            <article class="feature-card">
+              <p class="card-kicker">Active source</p>
+              <h3>Environmental exposure review</h3>
+              <p>
+                Review full text, inspect parsing status, and jump directly to
+                extracted chunks for downstream analysis or model prompts.
+              </p>
+              <div class="meta-row">
+                <span>18 pages</span>
+                <span>124 chunks</span>
+                <span>7 linked datasets</span>
+              </div>
+            </article>
+
+            <div class="split-card">
+              <div>
+                <p class="section-label">Parsed views</p>
+                <ul class="link-list">
+                  <li><a href="#paper">Original paper</a></li>
+                  <li><a href="#parsed">Structured parse (JSON)</a></li>
+                  <li><a href="#chunks">Chunk index</a></li>
+                  <li><a href="#citations">Citation graph</a></li>
+                </ul>
+              </div>
+              <div>
+                <p class="section-label">Linked assets</p>
+                <ul class="link-list">
+                  <li><a href="#data">Exposure dataset</a></li>
+                  <li><a href="#codebook">Codebook</a></li>
+                  <li><a href="#analysis">Analysis notebook</a></li>
+                  <li><a href="#export">Export bundle</a></li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="reader-card">
+              <div class="reader-toolbar">
+                <span>Full text reader</span>
+                <span class="reader-mode">Synced with chunks</span>
+              </div>
+              <div class="paper-body">
+                <h3 id="paper">Abstract</h3>
+                <p>
+                  This interface is designed to keep source literature,
+                  structured document representations, model-assisted querying,
+                  and reproducible R analysis in a single browser workspace.
+                </p>
+                <p>
+                  Selecting chunk references can route context into the LLM
+                  panel and also expose linked data products for statistical
+                  work. The intent is to shorten the path from reading to
+                  analysis without losing provenance.
+                </p>
+                <div class="chunk-preview" id="chunks">
+                  <div class="chunk-chip">Chunk 014: cohort design</div>
+                  <div class="chunk-chip">Chunk 027: exposure metrics</div>
+                  <div class="chunk-chip">Chunk 052: regression summary</div>
+                  <div class="chunk-chip">Chunk 089: sensitivity analysis</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel llm-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="section-label">Panel 2</p>
+              <h2>LLM Research Console</h2>
+            </div>
+            <div class="connection-badge">
+              <span class="pulse"></span>
+              Ready for ChatGPT or API connector
+            </div>
+          </div>
+
+          <div class="integration-strip">
+            <div class="integration-card">
+              <span class="integration-label">Context source</span>
+              <strong>Document chunks + linked data</strong>
+            </div>
+            <div class="integration-card">
+              <span class="integration-label">Prompt target</span>
+              <strong>OpenAI / compatible LLM</strong>
+            </div>
+            <div class="integration-card">
+              <span class="integration-label">Output path</span>
+              <strong>Tiles, notes, RStudio handoff</strong>
+            </div>
+          </div>
+
+          <div class="chat-shell">
+            <div class="chat-thread">
+              <div class="message message-system">
+                <span class="message-role">System</span>
+                <p>
+                  You are working with parsed paper sections, chunk references,
+                  and connected epidemiology datasets.
+                </p>
+              </div>
+              <div class="message message-user">
+                <span class="message-role">Researcher</span>
+                <p>
+                  Compare the exposure variables in chunk 027 with the linked
+                  dataset schema and suggest an R modeling path.
+                </p>
+              </div>
+              <div class="message message-assistant">
+                <span class="message-role">Assistant</span>
+                <p>
+                  The chunk describes three exposure measures that map to the
+                  `pm25_avg`, `lead_level`, and `distance_to_source` columns.
+                  A first-pass model could begin with a multivariable linear
+                  regression, then branch to stratified sensitivity checks in
+                  RStudio.
+                </p>
+              </div>
+            </div>
+
+            <form class="prompt-box">
+              <label for="prompt" class="section-label">Prompt workspace</label>
+              <textarea
+                id="prompt"
+                name="prompt"
+                rows="6"
+                placeholder="Ask questions about a paper, send selected chunks, or request an R analysis plan..."
+              ></textarea>
+              <div class="prompt-actions">
+                <button type="button" class="secondary-button" id="inject-context">
+                  Insert selected chunks
+                </button>
+                <button type="button" class="primary-button" id="send-prompt">
+                  Send to model
+                </button>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <div class="right-column">
+          <section class="panel output-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="section-label">Panel 3</p>
+                <h2>Output Window</h2>
+              </div>
+              <button class="ghost-button">Create Tile</button>
+            </div>
+
+            <div class="tile-grid">
+              <article class="output-tile accent-coral">
+                <p class="tile-label">Summary</p>
+                <h3>Paper brief</h3>
+                <p>One-page narrative synthesis generated from selected chunks.</p>
+              </article>
+              <article class="output-tile accent-gold">
+                <p class="tile-label">Data link</p>
+                <h3>Schema match</h3>
+                <p>Fields mapped between extracted variables and source tables.</p>
+              </article>
+              <article class="output-tile accent-teal">
+                <p class="tile-label">Method</p>
+                <h3>Analysis plan</h3>
+                <p>Recommended R workflow and candidate model sequence.</p>
+              </article>
+              <article class="output-tile accent-ink">
+                <p class="tile-label">Export</p>
+                <h3>Report package</h3>
+                <p>Bundle outputs, citations, scripts, and provenance metadata.</p>
+              </article>
+            </div>
+          </section>
+
+          <section class="panel rstudio-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="section-label">Panel 4</p>
+                <h2>RStudio Workspace</h2>
+              </div>
+              <button class="ghost-button">Launch Session</button>
+            </div>
+
+            <div class="rstudio-frame">
+              <div class="rstudio-sidebar">
+                <span class="tab active">Files</span>
+                <span class="tab">Plots</span>
+                <span class="tab">Packages</span>
+                <span class="tab">Help</span>
+              </div>
+              <div class="rstudio-main">
+                <div class="console-header">
+                  <span>analysis.R</span>
+                  <span class="console-state">Linked to selected paper</span>
+                </div>
+                <pre class="console-output"><code>library(tidyverse)
+library(broom)
+
+paper_chunks <- load_chunks("environmental_exposure_review")
+linked_data <- read_csv("data/exposure_dataset.csv")
+
+model <- lm(outcome_score ~ pm25_avg + lead_level + age + sex, data = linked_data)
+tidy(model)</code></pre>
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

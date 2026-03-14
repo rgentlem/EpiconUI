@@ -1,0 +1,510 @@
+:root {
+  --bg: #f4efe6;
+  --bg-strong: #efe4d3;
+  --surface: rgba(255, 250, 242, 0.78);
+  --surface-strong: rgba(255, 248, 237, 0.92);
+  --border: rgba(67, 48, 31, 0.12);
+  --text: #22170f;
+  --muted: #6d5b4d;
+  --brand: #0f6c5c;
+  --brand-soft: rgba(15, 108, 92, 0.14);
+  --coral: #d76a42;
+  --gold: #c08a13;
+  --teal: #25767b;
+  --ink: #2d4059;
+  --shadow: 0 18px 48px rgba(44, 28, 14, 0.12);
+  --radius: 22px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: "Avenir Next", "Trebuchet MS", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top left, rgba(215, 106, 66, 0.18), transparent 25%),
+    radial-gradient(circle at top right, rgba(37, 118, 123, 0.14), transparent 28%),
+    linear-gradient(180deg, #f7f2e8 0%, #ebdfcf 100%);
+}
+
+button,
+textarea,
+a {
+  font: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.app-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.eyebrow,
+.section-label,
+.tile-label,
+.integration-label,
+.card-kicker,
+.message-role {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.app-header h1,
+.panel-heading h2,
+.feature-card h3,
+.output-tile h3 {
+  margin: 6px 0 0;
+}
+
+.app-header h1 {
+  font-size: clamp(2rem, 3vw, 3.5rem);
+  line-height: 0.95;
+}
+
+.header-status {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.status-chip,
+.ghost-button,
+.secondary-button,
+.primary-button,
+.connection-badge,
+.chunk-chip,
+.tab,
+.reader-mode {
+  border-radius: 999px;
+}
+
+.status-chip,
+.connection-badge,
+.ghost-button,
+.secondary-button,
+.primary-button {
+  border: 1px solid var(--border);
+  background: rgba(255, 250, 242, 0.74);
+  padding: 10px 14px;
+  color: var(--text);
+}
+
+.workspace-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  min-height: calc(100vh - 132px);
+}
+
+.right-column {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  min-height: 0;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+  backdrop-filter: blur(18px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.panel-scroll,
+.chat-shell,
+.output-panel,
+.rstudio-panel {
+  min-height: 0;
+}
+
+.panel-scroll,
+.chat-shell {
+  padding: 20px;
+  overflow: auto;
+}
+
+.feature-card,
+.split-card,
+.reader-card,
+.integration-strip,
+.chat-thread,
+.prompt-box,
+.tile-grid,
+.rstudio-frame {
+  display: grid;
+  gap: 16px;
+}
+
+.feature-card,
+.split-card,
+.reader-card,
+.integration-card,
+.message,
+.prompt-box,
+.output-tile,
+.rstudio-frame {
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+}
+
+.feature-card,
+.reader-card,
+.prompt-box,
+.rstudio-frame {
+  padding: 18px;
+}
+
+.feature-card p,
+.output-tile p,
+.message p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.split-card {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 18px;
+}
+
+.link-list {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.link-list li + li {
+  margin-top: 10px;
+}
+
+.link-list a {
+  color: var(--brand);
+  text-decoration: none;
+}
+
+.link-list a:hover {
+  text-decoration: underline;
+}
+
+.reader-toolbar,
+.console-header,
+.prompt-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reader-toolbar,
+.console-header {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.reader-mode {
+  padding: 7px 10px;
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.paper-body h3 {
+  margin-bottom: 10px;
+}
+
+.paper-body p {
+  line-height: 1.65;
+}
+
+.chunk-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.chunk-chip {
+  padding: 9px 12px;
+  background: rgba(45, 64, 89, 0.08);
+  color: var(--ink);
+}
+
+.connection-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.pulse {
+  width: 10px;
+  height: 10px;
+  background: var(--brand);
+  border-radius: 999px;
+  box-shadow: 0 0 0 0 rgba(15, 108, 92, 0.45);
+  animation: pulse 1.8s infinite;
+}
+
+.integration-strip {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 20px 20px 0;
+  margin-bottom: 18px;
+}
+
+.integration-card {
+  padding: 16px;
+  background: rgba(255, 248, 237, 0.7);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+}
+
+.chat-thread {
+  margin-bottom: 18px;
+}
+
+.message {
+  padding: 16px;
+}
+
+.message-system {
+  border-left: 4px solid var(--gold);
+}
+
+.message-user {
+  border-left: 4px solid var(--coral);
+}
+
+.message-assistant {
+  border-left: 4px solid var(--teal);
+}
+
+.prompt-box textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--text);
+  min-height: 140px;
+}
+
+.ghost-button,
+.secondary-button,
+.primary-button {
+  cursor: pointer;
+  transition: transform 140ms ease, background 140ms ease, border-color 140ms ease;
+}
+
+.ghost-button:hover,
+.secondary-button:hover,
+.primary-button:hover {
+  transform: translateY(-1px);
+}
+
+.primary-button {
+  background: var(--brand);
+  color: #f8fbfa;
+  border-color: transparent;
+}
+
+.secondary-button {
+  background: rgba(45, 64, 89, 0.08);
+}
+
+.output-panel,
+.rstudio-panel {
+  padding-bottom: 20px;
+}
+
+.tile-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 20px;
+  overflow: auto;
+}
+
+.output-tile {
+  min-height: 150px;
+  padding: 18px;
+  position: relative;
+  overflow: hidden;
+}
+
+.output-tile::after {
+  content: "";
+  position: absolute;
+  inset: auto -20px -20px auto;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.26);
+}
+
+.accent-coral {
+  background: linear-gradient(180deg, rgba(215, 106, 66, 0.18), rgba(255, 248, 237, 0.95));
+}
+
+.accent-gold {
+  background: linear-gradient(180deg, rgba(192, 138, 19, 0.18), rgba(255, 248, 237, 0.95));
+}
+
+.accent-teal {
+  background: linear-gradient(180deg, rgba(37, 118, 123, 0.18), rgba(255, 248, 237, 0.95));
+}
+
+.accent-ink {
+  background: linear-gradient(180deg, rgba(45, 64, 89, 0.18), rgba(255, 248, 237, 0.95));
+}
+
+.rstudio-frame {
+  grid-template-columns: 88px minmax(0, 1fr);
+  min-height: 0;
+  margin: 0 20px;
+  overflow: hidden;
+}
+
+.rstudio-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 12px;
+  background: rgba(45, 64, 89, 0.06);
+  border-right: 1px solid var(--border);
+}
+
+.tab {
+  padding: 10px 12px;
+  text-align: center;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.tab.active {
+  background: var(--ink);
+  color: #f6f3ee;
+}
+
+.rstudio-main {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+}
+
+.console-header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.console-state {
+  color: var(--brand);
+}
+
+.console-output {
+  margin: 0;
+  padding: 18px 16px 22px;
+  overflow: auto;
+  font-family: "SFMono-Regular", "Menlo", "Consolas", monospace;
+  font-size: 0.92rem;
+  line-height: 1.65;
+  color: #e8f3f0;
+  background: linear-gradient(180deg, #233341, #17212c);
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(15, 108, 92, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(15, 108, 92, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(15, 108, 92, 0);
+  }
+}
+
+@media (max-width: 1100px) {
+  .workspace-grid {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .right-column {
+    grid-template-rows: repeat(2, minmax(320px, auto));
+  }
+
+  .integration-strip,
+  .tile-grid,
+  .split-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    padding: 16px;
+  }
+
+  .app-header,
+  .panel-heading,
+  .reader-toolbar,
+  .console-header,
+  .prompt-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .header-status {
+    justify-content: flex-start;
+  }
+
+  .rstudio-frame {
+    grid-template-columns: 1fr;
+  }
+
+  .rstudio-sidebar {
+    flex-direction: row;
+    overflow: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+}
