@@ -72,6 +72,8 @@ def now_iso() -> str:
 def read_json(path: Path, default: Any) -> Any:
     if not path.exists():
         return default
+    if path.is_dir():
+        return default
     return json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -204,8 +206,11 @@ def ingest_pdf_to_project(
         "figures_dir": str(paper_paths.figures_dir),
         "tables_dir": str(paper_paths.tables_dir),
         "metadata_dir": str(paper_paths.metadata_dir),
+        "metadata_path": str(paper_paths.metadata_path),
+        "manifest_path": str(paper_paths.root_dir / "manifest.json"),
         "ingested_at": now_iso(),
         "manifest": extraction_manifest,
+        "rag": {},
     }
     write_json(paper_paths.metadata_path, paper_record)
     sync_project_index(project, paper_record)
@@ -233,6 +238,8 @@ def ingest_pdf_to_project(
             "tables_dir": str(paper_paths.tables_dir),
             "metadata_dir": str(paper_paths.metadata_dir),
             "metadata_path": str(paper_paths.metadata_path),
+            "manifest_path": str(paper_paths.root_dir / "manifest.json"),
+            "rag": {},
         },
         "manifest": extraction_manifest,
     }

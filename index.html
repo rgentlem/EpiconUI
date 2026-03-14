@@ -71,68 +71,6 @@
                 </p>
               </article>
             </div>
-
-            <article class="feature-card">
-              <p class="card-kicker">Active source</p>
-              <h3>Environmental exposure review</h3>
-              <p>
-                Review full text, inspect parsing status, and jump directly to
-                extracted chunks for downstream analysis or model prompts.
-              </p>
-              <div class="meta-row">
-                <span>18 pages</span>
-                <span>124 chunks</span>
-                <span>7 linked datasets</span>
-              </div>
-            </article>
-
-            <div class="split-card">
-              <div>
-                <p class="section-label">Parsed views</p>
-                <ul class="link-list">
-                  <li><a href="#paper">Original paper</a></li>
-                  <li><a href="#parsed">Structured parse (JSON)</a></li>
-                  <li><a href="#chunks">Chunk index</a></li>
-                  <li><a href="#citations">Citation graph</a></li>
-                </ul>
-              </div>
-              <div>
-                <p class="section-label">Linked assets</p>
-                <ul class="link-list">
-                  <li><a href="#data">Exposure dataset</a></li>
-                  <li><a href="#codebook">Codebook</a></li>
-                  <li><a href="#analysis">Analysis notebook</a></li>
-                  <li><a href="#export">Export bundle</a></li>
-                </ul>
-              </div>
-            </div>
-
-            <div class="reader-card">
-              <div class="reader-toolbar">
-                <span>Full text reader</span>
-                <span class="reader-mode">Synced with chunks</span>
-              </div>
-              <div class="paper-body">
-                <h3 id="paper">Abstract</h3>
-                <p>
-                  This interface is designed to keep source literature,
-                  structured document representations, model-assisted querying,
-                  and reproducible R analysis in a single browser workspace.
-                </p>
-                <p>
-                  Selecting chunk references can route context into the LLM
-                  panel and also expose linked data products for statistical
-                  work. The intent is to shorten the path from reading to
-                  analysis without losing provenance.
-                </p>
-                <div class="chunk-preview" id="chunks">
-                  <div class="chunk-chip">Chunk 014: cohort design</div>
-                  <div class="chunk-chip">Chunk 027: exposure metrics</div>
-                  <div class="chunk-chip">Chunk 052: regression summary</div>
-                  <div class="chunk-chip">Chunk 089: sensitivity analysis</div>
-                </div>
-              </div>
-            </div>
           </div>
         </section>
 
@@ -229,30 +167,39 @@
         <div class="right-column">
           <section class="panel output-panel">
             <div class="panel-heading">
-              <h2>Output Window</h2>
-              <button class="ghost-button">Create Tile</button>
+              <h2>Status</h2>
+              <span class="section-label">Paper indexing</span>
             </div>
 
-            <div class="tile-grid">
-              <article class="output-tile accent-coral">
-                <p class="tile-label">Summary</p>
-                <h3>Paper brief</h3>
-                <p>One-page narrative synthesis generated from selected chunks.</p>
+            <div class="action-panel-scroll">
+              <article class="paper-action-status-hero" id="paper-action-status-hero">
+                <p class="section-label">Current state</p>
+                <h3>No paper selected</h3>
+                <p>Choose a paper to see indexing state.</p>
               </article>
-              <article class="output-tile accent-gold">
-                <p class="tile-label">Data link</p>
-                <h3>Schema match</h3>
-                <p>Fields mapped between extracted variables and source tables.</p>
+
+              <div class="action-status-card">
+                <div>
+                  <p class="section-label">Action status</p>
+                  <h3>Tracker</h3>
+                </div>
+                <p id="paper-action-status">Choose a paper to enable actions.</p>
+              </div>
+
+              <article class="paper-action-summary" id="paper-action-summary">
+                <p class="section-label">No paper selected</p>
+                <h3>Select a paper on the left</h3>
+                <p>The selected paper's indexing details will appear here.</p>
               </article>
-              <article class="output-tile accent-teal">
-                <p class="tile-label">Method</p>
-                <h3>Analysis plan</h3>
-                <p>Recommended R workflow and candidate model sequence.</p>
-              </article>
-              <article class="output-tile accent-ink">
-                <p class="tile-label">Export</p>
-                <h3>Report package</h3>
-                <p>Bundle outputs, citations, scripts, and provenance metadata.</p>
+
+              <article class="status-log-card">
+                <div>
+                  <p class="section-label">Recent events</p>
+                  <h3>Status log</h3>
+                </div>
+                <div class="status-log-list" id="status-log-list">
+                  <p class="status-log-empty">No actions yet.</p>
+                </div>
               </article>
             </div>
           </section>

@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from project_store import ensure_paper_paths, ensure_project, list_projects
+from project_store import ensure_paper_paths, ensure_project, list_projects, read_json
 
 
 class ProjectStoreTests(unittest.TestCase):
@@ -34,6 +34,11 @@ class ProjectStoreTests(unittest.TestCase):
             projects = list_projects(tmp_dir)
 
             self.assertEqual([project["project_slug"] for project in projects], ["air-quality", "exposure-mapping"])
+
+    def test_read_json_returns_default_for_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result = read_json(Path(tmp_dir), {"ok": True})
+            self.assertEqual(result, {"ok": True})
 
 
 if __name__ == "__main__":

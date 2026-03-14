@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import tempfile
 from email.parser import BytesParser
 from email.policy import default
@@ -15,6 +16,7 @@ from llm_client import create_chat_completion
 from project_store import ensure_project, ingest_pdf_to_project, list_projects, read_json
 
 APP_ROOT = Path(__file__).resolve().parent
+AUTO_INDEX_RAG = os.environ.get("EPIMIND_AUTO_INDEX_RAG", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def parse_multipart_form_data(content_type: str, body: bytes) -> dict[str, list[dict[str, str | bytes]]]:
@@ -74,6 +76,15 @@ def paper_record(project_name: str, paper_slug: str, base_dir: str | Path | None
         if item.get("paper_slug") == paper_slug:
             return item
     return None
+
+
+def run_paper_action(action: str, project_name: str, paper_slug: str, base_dir: str | Path | None = None) -> dict:
+    normalized = action.strip().lower()
+    if normalized == "index_rag":
+        from rag_store import index_project_paper
+
+        return index_project_paper(project_name, paper_slug, base_dir=base_dir)
+    raise ValueError(f"Unsupported paper action: {action}")
 
 
 def load_paper_context(project_name: str, paper_slug: str, base_dir: str | Path | None = None) -> str:
@@ -154,6 +165,10 @@ class EpiMindHandler(SimpleHTTPRequestHandler):
 
         if parsed.path == "/api/chat":
             self.handle_chat()
+            return
+
+        if parsed.path == "/api/paper-actions":
+            self.handle_paper_action()
             return
 
         self.send_json({"error": "Not found."}, status=HTTPStatus.NOT_FOUND)
@@ -251,6 +266,43 @@ class EpiMindHandler(SimpleHTTPRequestHandler):
             }
         )
 
+    def handle_paper_action(self) -> None:
+        payload = self.read_json_body()
+        action = str(payload.get("action", "")).strip()
+        project_name = str(payload.get("project_name", "")).strip()
+        paper_slug = str(payload.get("paper_slug", "")).strip()
+
+        if not action:
+            self.send_json({"error": "Action is required."}, status=HTTPStatus.BAD_REQUEST)
+            return
+        if not project_name:
+            self.send_json({"error": "Project name is required."}, status=HTTPStatus.BAD_REQUEST)
+            return
+        if not paper_slug:
+            self.send_json({"error": "Paper slug is required."}, status=HTTPStatus.BAD_REQUEST)
+            return
+
+        try:
+            result = run_paper_action(action, project_name, paper_slug, base_dir=self.base_dir)
+        except ValueError as exc:
+            self.send_json({"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+            return
+        except Exception as exc:
+            self.send_json({"error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+
+        refreshed = project_payload(project_name, base_dir=self.base_dir)
+        self.send_json(
+            {
+                "ok": True,
+                "action": action,
+                "result": result,
+                "project": refreshed["project"],
+                "papers": refreshed["papers"],
+                "paper": paper_record(project_name, paper_slug, base_dir=self.base_dir),
+            }
+        )
+
     def handle_upload(self) -> None:
         content_type = self.headers.get("Content-Type", "")
         length = int(self.headers.get("Content-Length", "0"))
@@ -285,9 +337,25 @@ class EpiMindHandler(SimpleHTTPRequestHandler):
                 temp_path,
                 base_dir=self.base_dir,
             )
+            rag_payload = None
+            if AUTO_INDEX_RAG:
+                try:
+                    from rag_store import index_project_paper
+
+                    rag_payload = index_project_paper(
+                        result["project"]["project_slug"],
+                        result["paper"]["paper_slug"],
+                        base_dir=self.base_dir,
+                    )
+                except Exception as exc:
+                    rag_payload = {
+                        "indexed": False,
+                        "error": str(exc),
+                    }
             payload = {
                 **result,
                 "papers": project_payload(project_name, base_dir=self.base_dir)["papers"],
+                "rag": rag_payload,
             }
             self.send_json(payload)
         except Exception as exc:

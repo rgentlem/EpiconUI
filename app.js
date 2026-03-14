@@ -13,6 +13,10 @@ const paperTileGrid = document.querySelector("#paper-tile-grid");
 const paperDetailCard = document.querySelector("#paper-detail-card");
 const paperCount = document.querySelector("#paper-count");
 const projectStatus = document.querySelector("#project-status");
+const paperActionSummary = document.querySelector("#paper-action-summary");
+const paperActionStatusHero = document.querySelector("#paper-action-status-hero");
+const paperActionStatus = document.querySelector("#paper-action-status");
+const statusLogList = document.querySelector("#status-log-list");
 const llmConfigForm = document.querySelector("#llm-config-form");
 const llmBaseUrlInput = document.querySelector("#llm-base-url");
 const llmModelInput = document.querySelector("#llm-model");
@@ -32,6 +36,9 @@ const appState = {
   projectRoot: "",
   papers: [],
   selectedPaperId: null,
+  actionBusy: false,
+  paperActionStatusMessage: "",
+  statusLog: [],
   llmConfigured: false,
   llmEditorOpen: true,
   projectCatalog: [],
@@ -70,6 +77,7 @@ function buildPaperRecord(fileName) {
     tablesPath: `${paperRoot}/tables`,
     manifestPath: `${paperRoot}/manifest.json`,
     uploadedAt: new Date().toLocaleString(),
+    rag: {},
   };
 }
 
@@ -80,6 +88,17 @@ function setStatus(message, isError = false) {
 
   projectStatus.textContent = message;
   projectStatus.style.color = isError ? "#b13b2f" : "";
+}
+
+function addStatusLog(message, level = "info", paperSlug = appState.selectedPaperId) {
+  appState.statusLog.unshift({
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    message,
+    level,
+    paperSlug: paperSlug || "",
+    timestamp: new Date().toLocaleTimeString(),
+  });
+  appState.statusLog = appState.statusLog.slice(0, 12);
 }
 
 function setLlmStatus(message, isError = false) {
@@ -125,6 +144,7 @@ function normalizePaperRecord(record) {
     tablesPath: record.tables_dir,
     manifestPath: `${record.paper_dir}/manifest.json`,
     uploadedAt: record.ingested_at || "Available",
+    rag: record.rag || {},
   };
 }
 
@@ -225,6 +245,26 @@ async function sendPrompt(message) {
   return payload;
 }
 
+async function runPaperAction(action) {
+  const response = await fetch("/api/paper-actions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      action,
+      project_name: appState.projectName,
+      paper_slug: appState.selectedPaperId,
+    }),
+  });
+
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error || "Paper action failed.");
+  }
+  return payload;
+}
+
 function renderLlmConfig(config) {
   if (llmBaseUrlInput) {
     llmBaseUrlInput.value = config.base_url || "";
@@ -290,6 +330,126 @@ function renderProjectSummary() {
   }
 }
 
+function selectedPaper() {
+  return appState.papers.find((item) => item.id === appState.selectedPaperId) || null;
+}
+
+function runIndexSelectedPaper() {
+  const paper = selectedPaper();
+  if (!paper || !appState.projectName || appState.actionBusy) {
+    return;
+  }
+
+  appState.actionBusy = true;
+  appState.paperActionStatusMessage = `Embedding ${paper.paperName}...`;
+  addStatusLog(`Started embedding ${paper.paperName}.`, "running", paper.id);
+  renderPaperDetail();
+  renderPaperActionPanel();
+
+  runPaperAction("index_rag")
+    .then((payload) => {
+      syncProjectPayload(payload);
+      appState.selectedPaperId = payload.paper?.paper_slug || paper.id;
+      appState.paperActionStatusMessage = `Indexed ${payload.paper.paper_name}.`;
+      addStatusLog(`Indexed ${payload.paper.paper_name}.`, "success", payload.paper?.paper_slug || paper.id);
+      renderProjectSummary();
+      renderPaperTiles();
+      renderPaperDetail();
+      renderPaperActionPanel();
+    })
+    .catch((error) => {
+      appState.paperActionStatusMessage = error.message;
+      addStatusLog(`Embedding failed: ${error.message}`, "error", paper.id);
+    })
+    .finally(() => {
+      appState.actionBusy = false;
+      renderPaperDetail();
+      renderPaperActionPanel();
+    });
+}
+
+function renderPaperActionPanel() {
+  if (!paperActionSummary || !paperActionStatusHero || !paperActionStatus || !statusLogList) {
+    return;
+  }
+
+  const paper = selectedPaper();
+  if (!paper) {
+    paperActionSummary.innerHTML = `
+      <p class="section-label">No paper selected</p>
+      <h3>Select a paper on the left</h3>
+      <p>The selected paper's indexing details will appear here.</p>
+    `;
+    paperActionStatusHero.innerHTML = `
+      <p class="section-label">Current state</p>
+      <h3>No paper selected</h3>
+      <p>Choose a paper to see indexing state.</p>
+    `;
+    paperActionStatus.textContent = "Choose a paper to enable actions.";
+    statusLogList.innerHTML = '<p class="status-log-empty">No actions yet.</p>';
+    return;
+  }
+
+  const rag = paper.rag || {};
+  const indexed = Boolean(rag.indexed_at);
+  paperActionSummary.innerHTML = `
+    <p class="section-label">Active paper</p>
+    <h3>${paper.paperName}</h3>
+    <p>Selected for vector indexing.</p>
+    <div class="action-meta-grid">
+      <div class="action-meta-item">
+        <span class="section-label">Vector status</span>
+        <strong>${indexed ? "Indexed" : "Not indexed"}</strong>
+      </div>
+      <div class="action-meta-item">
+        <span class="section-label">Embedding model</span>
+        <strong>${rag.embedding_model || "Not set"}</strong>
+      </div>
+      <div class="action-meta-item">
+        <span class="section-label">Chunks</span>
+        <strong>${rag.chunk_count || "Unknown"}</strong>
+      </div>
+      <div class="action-meta-item">
+        <span class="section-label">Last indexed</span>
+        <strong>${rag.indexed_at || "Not yet run"}</strong>
+      </div>
+    </div>
+  `;
+  paperActionStatusHero.innerHTML = `
+    <p class="section-label">Current state</p>
+    <h3>${indexed ? "Indexed" : "Not indexed"}</h3>
+    <p>${
+      appState.actionBusy
+        ? `Embedding ${paper.paperName} now.`
+        : indexed
+          ? `${paper.paperName} is present in Postgres.`
+          : `${paper.paperName} has not been embedded yet.`
+    }</p>
+  `;
+
+  if (appState.actionBusy) {
+    paperActionStatus.textContent = appState.paperActionStatusMessage || `Running action for ${paper.paperName}...`;
+  } else {
+    paperActionStatus.textContent =
+      appState.paperActionStatusMessage ||
+      (indexed ? `Vector index ready for ${paper.paperName}.` : `Vector index not created yet for ${paper.paperName}.`);
+  }
+
+  const visibleEntries = appState.statusLog.filter((entry) => !entry.paperSlug || entry.paperSlug === paper.id).slice(0, 6);
+  statusLogList.innerHTML = visibleEntries.length
+    ? visibleEntries
+        .map(
+          (entry) => `
+            <div class="status-log-item status-${entry.level}">
+              <span class="section-label">${entry.timestamp}</span>
+              <p>${entry.message}</p>
+            </div>
+          `
+        )
+        .join("")
+    : '<p class="status-log-empty">No actions yet.</p>';
+}
+
 function renderProjectCatalog() {
   if (!projectSelect) {
     return;
@@ -330,8 +490,10 @@ function renderPaperTiles() {
     `;
     tile.addEventListener("click", () => {
       appState.selectedPaperId = paper.id;
+      appState.paperActionStatusMessage = "";
       renderPaperTiles();
       renderPaperDetail();
+      renderPaperActionPanel();
     });
     paperTileGrid.append(tile);
   });
@@ -352,10 +514,21 @@ function renderPaperDetail() {
     return;
   }
 
+  const rag = paper.rag || {};
+  const indexed = Boolean(rag.indexed_at);
   paperDetailCard.innerHTML = `
     <p class="section-label">Paper contents</p>
     <h3>${paper.paperName}</h3>
-    <p>Uploaded ${paper.uploadedAt}. The storage structure is internal; for now this panel shows the generated paper assets available under the paper record.</p>
+    <div class="paper-inline-tools">
+      <div class="paper-inline-state">
+        <span class="section-label">Vector DB</span>
+        <strong>${appState.actionBusy ? "Working..." : indexed ? "Indexed" : "Not indexed"}</strong>
+      </div>
+      <button class="primary-button" id="index-paper-inline" type="button" ${appState.actionBusy ? "disabled" : ""}>
+        ${appState.actionBusy ? "Embedding..." : indexed ? "Refresh Embedding" : "Embed Paper"}
+      </button>
+    </div>
+    <p>${appState.paperActionStatusMessage || `Uploaded ${paper.uploadedAt}.`}</p>
     <div class="paper-detail-list">
       <div class="paper-path-item">
         <span class="section-label">Directory</span>
@@ -395,6 +568,14 @@ function renderPaperDetail() {
       </div>
     </div>
   `;
+  paperDetailCard.querySelector("#index-paper-inline")?.addEventListener("click", runIndexSelectedPaper);
+}
+
+function syncProjectPayload(payload) {
+  appState.projectName = payload.project.project_name;
+  appState.projectSlug = payload.project.project_slug;
+  appState.projectRoot = payload.project.root_dir;
+  appState.papers = (payload.papers || []).map(normalizePaperRecord);
 }
 
 injectButton?.addEventListener("click", () => {
@@ -507,10 +688,10 @@ projectForm?.addEventListener("submit", (event) => {
   createProject(value)
     .then((payload) => {
       appState.projectName = payload.project.project_name;
-      appState.projectSlug = payload.project.project_slug;
-      appState.projectRoot = payload.project.root_dir;
-      appState.papers = (payload.papers || []).map(normalizePaperRecord);
+      syncProjectPayload(payload);
       appState.selectedPaperId = appState.papers[0]?.id ?? null;
+      appState.paperActionStatusMessage = "";
+      addStatusLog(`Opened project ${payload.project.project_name}.`, "info", appState.selectedPaperId);
 
       renderProjectSummary();
       if (!appState.projectCatalog.some((project) => project.project_name === payload.project.project_name)) {
@@ -524,6 +705,7 @@ projectForm?.addEventListener("submit", (event) => {
       renderProjectCatalog();
       renderPaperTiles();
       renderPaperDetail();
+      renderPaperActionPanel();
       setStatus(`Project ready: ${payload.project.root_dir}`);
       if (projectNameInput) {
         projectNameInput.value = "";
@@ -552,24 +734,32 @@ paperUploadInput?.addEventListener("change", (event) => {
   const placeholder = buildPaperRecord(file.name);
   appState.papers = [placeholder, ...appState.papers.filter((item) => item.paperSlug !== placeholder.paperSlug)];
   appState.selectedPaperId = placeholder.id;
+  appState.paperActionStatusMessage = `Uploading ${file.name}...`;
   renderPaperTiles();
   renderPaperDetail();
+  renderPaperActionPanel();
   setStatus(`Uploading ${file.name}... this may take a moment.`);
+  addStatusLog(`Started upload for ${placeholder.paperName}.`, "running", placeholder.id);
 
   uploadPaper(appState.projectName, file)
     .then((payload) => {
       appState.projectName = payload.project.project_name;
-      appState.projectSlug = payload.project.project_slug;
-      appState.projectRoot = payload.project.root_dir;
-      appState.papers = (payload.papers || []).map(normalizePaperRecord);
+      syncProjectPayload(payload);
       appState.selectedPaperId = payload.paper.paper_slug;
+      appState.paperActionStatusMessage = payload.rag?.indexed_at || payload.paper?.rag?.indexed_at
+        ? `Vector index ready for ${payload.paper.paper_name}.`
+        : "";
+      addStatusLog(`Ingested ${payload.paper.paper_name}.`, "success", payload.paper.paper_slug);
       renderProjectSummary();
       renderPaperTiles();
       renderPaperDetail();
+      renderPaperActionPanel();
       setStatus(`Ingest complete: ${payload.paper.root_dir}`);
     })
     .catch((error) => {
       setStatus(error.message, true);
+      appState.paperActionStatusMessage = error.message;
+      addStatusLog(`Upload failed: ${error.message}`, "error", placeholder.id);
     })
     .finally(() => {
       input.value = "";
@@ -587,6 +777,7 @@ fetchProjects()
   });
 renderPaperTiles();
 renderPaperDetail();
+renderPaperActionPanel();
 setStatus("Start the local backend and create a project.");
 fetchLlmConfig()
   .then((payload) => {

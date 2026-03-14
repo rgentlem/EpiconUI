@@ -1,0 +1,16 @@
+services:
+  epimind-postgres:
+    image: pgvector/pgvector:pg16
+    container_name: epimind-postgres
+    environment:
+      POSTGRES_DB: ${EPIMIND_PGDATABASE:-epimind}
+      POSTGRES_USER: ${EPIMIND_PGUSER:-postgres}
+      POSTGRES_PASSWORD: ${EPIMIND_PGPASSWORD:-postgres}
+    ports:
+      - "${EPIMIND_PGPORT:-5432}:5432"
+    volumes:
+      - epimind-pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+
+volumes:
+  epimind-pgdata:

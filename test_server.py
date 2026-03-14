@@ -2,8 +2,9 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
-from server import parse_multipart_form_data, project_payload
+from server import parse_multipart_form_data, project_payload, run_paper_action
 
 
 class ServerTests(unittest.TestCase):
@@ -31,6 +32,16 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(fields["project_name"][0]["value"], "Demo Project")
         self.assertEqual(fields["file"][0]["filename"], "paper.pdf")
         self.assertEqual(fields["file"][0]["content"], b"%PDF-1.4\r\n")
+
+    def test_run_paper_action_rejects_unknown_action(self) -> None:
+        with self.assertRaises(ValueError):
+            run_paper_action("unknown", "Demo Project", "paper")
+
+    def test_run_paper_action_dispatches_index_rag(self) -> None:
+        with mock.patch("rag_store.index_project_paper", return_value={"paper_slug": "paper"}) as patched:
+            result = run_paper_action("index_rag", "Demo Project", "paper", base_dir="/tmp/demo")
+        patched.assert_called_once_with("Demo Project", "paper", base_dir="/tmp/demo")
+        self.assertEqual(result["paper_slug"], "paper")
 
 
 if __name__ == "__main__":

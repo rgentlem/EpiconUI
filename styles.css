@@ -210,7 +210,8 @@ a {
 .panel-scroll,
 .chat-shell,
 .output-panel,
-.rstudio-panel {
+.rstudio-panel,
+.action-panel-scroll {
   min-height: 0;
 }
 
@@ -222,15 +223,15 @@ a {
 
 .feature-card,
 .split-card,
-.reader-card,
-.integration-strip,
 .chat-thread,
 .llm-config-card,
 .llm-summary-card,
 .prompt-box,
 .paper-tiles-section,
 .tile-grid,
-.rstudio-frame {
+.rstudio-frame,
+.action-panel-scroll,
+.paper-action-grid {
   display: grid;
   gap: 16px;
 }
@@ -253,17 +254,17 @@ a {
 }
 
 .feature-card,
-.reader-card,
 .llm-config-card,
 .llm-summary-card,
 .prompt-box,
 .paper-detail-card,
-.rstudio-frame {
+.rstudio-frame,
+.paper-action-summary,
+.action-status-card {
   padding: 18px;
 }
 
 .feature-card p,
-.output-tile p,
 .message p {
   margin: 0;
   line-height: 1.5;
@@ -301,7 +302,6 @@ a {
   text-decoration: underline;
 }
 
-.reader-toolbar,
 .console-header,
 .prompt-actions {
   display: flex;
@@ -310,37 +310,9 @@ a {
   gap: 12px;
 }
 
-.reader-toolbar,
 .console-header {
   color: var(--muted);
   font-size: 0.88rem;
-}
-
-.reader-mode {
-  padding: 7px 10px;
-  background: var(--brand-soft);
-  color: var(--brand);
-}
-
-.paper-body h3 {
-  margin-bottom: 10px;
-}
-
-.paper-body p {
-  line-height: 1.65;
-}
-
-.chunk-preview {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 16px;
-}
-
-.chunk-chip {
-  padding: 9px 12px;
-  background: rgba(45, 64, 89, 0.08);
-  color: var(--ink);
 }
 
 .connection-badge {
@@ -494,6 +466,11 @@ a {
   padding-bottom: 20px;
 }
 
+.action-panel-scroll {
+  padding: 20px;
+  overflow: auto;
+}
+
 .paper-tiles-section {
   padding: 20px 20px 0;
 }
@@ -561,6 +538,23 @@ a {
   gap: 8px;
 }
 
+.paper-inline-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0 4px;
+}
+
+.paper-inline-state {
+  display: grid;
+  gap: 4px;
+}
+
+.paper-inline-state strong {
+  font-size: 0.95rem;
+}
+
 .paper-path-item {
   display: grid;
   gap: 4px;
@@ -580,44 +574,128 @@ a {
   align-items: center;
 }
 
-.tile-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  padding: 20px;
-  overflow: auto;
-  min-height: 0;
+.paper-action-summary,
+.action-status-card,
+.paper-action-card,
+.paper-action-status-hero {
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: 18px;
 }
 
-.output-tile {
-  min-height: 150px;
+.paper-action-summary h3,
+.action-status-card h3,
+.paper-action-card h3,
+.paper-action-status-hero h3 {
+  margin: 6px 0 0;
+}
+
+.paper-action-summary p,
+.action-status-card p,
+.paper-action-card p,
+.paper-action-status-hero p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.paper-action-status-hero {
   padding: 18px;
-  position: relative;
-  overflow: hidden;
+  background: linear-gradient(180deg, rgba(15, 108, 92, 0.18), rgba(255, 248, 237, 0.98));
 }
 
-.output-tile::after {
-  content: "";
-  position: absolute;
-  inset: auto -20px -20px auto;
-  width: 90px;
-  height: 90px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.26);
+.status-log-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  border-radius: 18px;
 }
 
-.accent-coral {
-  background: linear-gradient(180deg, rgba(215, 106, 66, 0.18), rgba(255, 248, 237, 0.95));
+.status-log-card h3 {
+  margin: 6px 0 0;
 }
 
-.accent-gold {
-  background: linear-gradient(180deg, rgba(192, 138, 19, 0.18), rgba(255, 248, 237, 0.95));
+.status-log-list {
+  display: grid;
+  gap: 10px;
 }
 
-.accent-teal {
-  background: linear-gradient(180deg, rgba(37, 118, 123, 0.18), rgba(255, 248, 237, 0.95));
+.status-log-item {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(45, 64, 89, 0.06);
 }
 
-.accent-ink {
-  background: linear-gradient(180deg, rgba(45, 64, 89, 0.18), rgba(255, 248, 237, 0.95));
+.status-log-item p,
+.status-log-empty {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.status-running {
+  background: rgba(192, 138, 19, 0.12);
+}
+
+.status-success {
+  background: rgba(15, 108, 92, 0.12);
+}
+
+.status-error {
+  background: rgba(215, 106, 66, 0.12);
+}
+
+.action-status-card {
+  display: grid;
+  gap: 10px;
+}
+
+.paper-action-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.paper-action-card {
+  min-height: 170px;
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+
+.paper-action-card button[disabled] {
+  cursor: not-allowed;
+  opacity: 0.62;
+  transform: none;
+}
+
+.action-live {
+  background: linear-gradient(180deg, rgba(15, 108, 92, 0.16), rgba(255, 248, 237, 0.96));
+}
+
+.action-future {
+  background: linear-gradient(180deg, rgba(45, 64, 89, 0.08), rgba(255, 248, 237, 0.96));
+}
+
+.action-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.action-meta-item {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(45, 64, 89, 0.06);
+}
+
+.action-meta-item strong {
+  font-size: 0.95rem;
+  font-weight: 600;
 }
 
 .rstudio-frame {
@@ -696,11 +774,11 @@ a {
     grid-template-rows: repeat(2, minmax(320px, auto));
   }
 
-  .integration-strip,
   .llm-config-grid,
   .paper-tile-grid,
-  .tile-grid,
-  .split-card {
+  .split-card,
+  .paper-action-grid,
+  .action-meta-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -722,7 +800,6 @@ a {
   .panel-heading,
   .paper-tiles-header,
   .llm-config-header,
-  .reader-toolbar,
   .console-header,
   .prompt-actions {
     flex-direction: column;
