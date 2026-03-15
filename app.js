@@ -107,6 +107,23 @@ function addStatusLog(message, level = "info", paperSlug = appState.selectedPape
   appState.statusLog = appState.statusLog.slice(0, 12);
 }
 
+function formatOutputSummary(item) {
+  const fallback = "Saved report available.";
+  if (!item || !item.summary) {
+    return fallback;
+  }
+
+  try {
+    const parsed = JSON.parse(item.summary);
+    const cycles = Array.isArray(parsed.cycles) ? parsed.cycles.length : 0;
+    const tables = Array.isArray(parsed.tables) ? parsed.tables.length : 0;
+    const variables = Array.isArray(parsed.variables) ? parsed.variables.length : 0;
+    return `${cycles} cycle${cycles === 1 ? "" : "s"}, ${tables} table${tables === 1 ? "" : "s"}, ${variables} variable${variables === 1 ? "" : "s"}.`;
+  } catch (error) {
+    return String(item.summary);
+  }
+}
+
 function setLlmStatus(message, isError = false) {
   if (!llmConfigStatus) {
     return;
@@ -479,11 +496,11 @@ function renderPaperActionPanel() {
           return `
             <article class="output-document-item">
               <p class="section-label">${String(item.kind || "output").replace(/_/g, " ")}</p>
-              <h4>${item.title}</h4>
-              <p>${item.summary || "Generated output document."}</p>
+              <h4><a href="${markdownHref}" target="_blank" rel="noreferrer">${item.title}</a></h4>
+              <p>${formatOutputSummary(item)}</p>
               <div class="output-document-links">
-                <a href="${markdownHref}" target="_blank" rel="noreferrer">Markdown</a>
-                <a href="${jsonHref}" target="_blank" rel="noreferrer">JSON</a>
+                <a href="${markdownHref}" target="_blank" rel="noreferrer">Open Markdown</a>
+                <a href="${jsonHref}" target="_blank" rel="noreferrer">Open JSON</a>
               </div>
             </article>
           `;
@@ -684,7 +701,6 @@ promptForm?.addEventListener("submit", (event) => {
       appState.selectedPaperId = payload.paper?.paper_slug || appState.selectedPaperId;
       if (saveOutput && payload.output) {
         appState.paperActionStatusMessage = `Created ${payload.output.title}.`;
-        appendMessage("assistant", `Saved output document: ${payload.output.title}\n\n${payload.output.summary}`);
         addStatusLog(`Created output ${payload.output.title}.`, "success", payload.paper?.paper_slug || appState.selectedPaperId);
       } else {
         appState.paperActionStatusMessage = "Quick view response ready.";

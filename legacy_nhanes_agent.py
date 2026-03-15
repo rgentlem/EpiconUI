@@ -483,6 +483,7 @@ def build_variable_candidate_messages(
     schema = {
         "variables": [
             {
+                "paper_mention": "age",
                 "variable_name": "RIDAGEYR",
                 "table_name": "DEMO_I",
                 "canonical_label": "Age in years at screening",
@@ -539,6 +540,7 @@ def normalize_candidate_selection(payload: dict[str, Any]) -> list[dict[str, Any
         seen.add(key)
         rows.append(
             {
+                "paper_mention": str(item.get("paper_mention", "")).strip(),
                 "variable_name": variable_name,
                 "table_name": table_name,
                 "canonical_label": str(item.get("canonical_label", "")).strip(),
@@ -636,7 +638,14 @@ def validate_tables(cur, tables: list[str]) -> list[dict[str, Any]]:
     return results
 
 
-def validate_variables(cur, variables: list[str]) -> list[dict[str, Any]]:
+def validate_variables(
+    cur,
+    variables: list[str],
+    *,
+    allowed_tables: set[str] | None = None,
+    allowed_cycles: set[str] | None = None,
+    allowed_table_cycle_pairs: set[tuple[str, str]] | None = None,
+) -> list[dict[str, Any]]:
     if not variables:
         return []
 
@@ -687,14 +696,31 @@ def validate_variables(cur, variables: list[str]) -> list[dict[str, Any]]:
         for row in matches:
             table_name = str(row[1])
             suffix = table_name.rsplit("_", 1)[-1] if "_" in table_name else ""
+            cycle = SUFFIX_TO_CYCLE.get(suffix, "")
+            if allowed_tables and table_name not in allowed_tables:
+                continue
+            if allowed_cycles and cycle and cycle not in allowed_cycles:
+                continue
+            if allowed_table_cycle_pairs and (table_name, cycle) not in allowed_table_cycle_pairs:
+                continue
             normalized_matches.append(
                 {
                     "table_name": table_name,
-                    "cycle": SUFFIX_TO_CYCLE.get(suffix, ""),
+                    "cycle": cycle,
                     "description": str(row[2] or ""),
                     "component": str(row[3] or ""),
                 }
             )
+        if not normalized_matches:
+            results.append(
+                {
+                    "variable": variable,
+                    "status": "not_found",
+                    "matches": [],
+                    "confidence": 0.2,
+                }
+            )
+            continue
         results.append(
             {
                 "variable": variable,
@@ -758,6 +784,61 @@ def build_canonical_matches(
     return rows
 
 
+def build_structured_summary(analysis: dict[str, Any]) -> dict[str, Any]:
+    cycles = []
+    for row in analysis["validated"]["cycles"]:
+        for cycle in row.get("canonical_cycles", []):
+            if cycle not in cycles:
+                cycles.append(cycle)
+
+    tables = []
+    for row in analysis["validated"]["tables"]:
+        tables.append(
+            {
+                "table_name": row["table_name"],
+                "cycle": row.get("cycle", ""),
+                "validation_status": "validated" if row.get("exists") else "not_found",
+            }
+        )
+
+    variables = []
+    for row in analysis["validated"]["variables"]:
+        variables.append(
+            {
+                "variable": row["variable"],
+                "validation_status": row["status"],
+                "paper_mentions": sorted(
+                    {
+                        item.get("paper_mention", "")
+                        for item in analysis.get("selected_metadata_variables", [])
+                        if item.get("variable_name") == row["variable"] and item.get("paper_mention")
+                    }
+                ),
+                "tables": [
+                    {
+                        "table_name": match["table_name"],
+                        "cycle": match.get("cycle", ""),
+                        "component": match.get("component", ""),
+                        "label": match.get("description", ""),
+                    }
+                    for match in row.get("matches", [])
+                ],
+            }
+        )
+
+    return {
+        "query": analysis["query"],
+        "intent": analysis["intent"],
+        "paper": {
+            "project_name": analysis["project_name"],
+            "paper_name": analysis["paper_name"],
+        },
+        "cycles": cycles,
+        "tables": tables,
+        "variables": variables,
+    }
+
+
 def build_summary(analysis: dict[str, Any]) -> str:
     intent = analysis["intent"]
     llm_summary = str(analysis.get("llm_summary", "")).strip()
@@ -783,7 +864,15 @@ def build_summary(analysis: dict[str, Any]) -> str:
         return llm_summary or "I could not determine the NHANES cycles used in the paper from the retrieved evidence."
 
     if intent == "variable_identification":
-        validated = [row["variable"] for row in analysis["validated"]["variables"] if row.get("status") == "validated"]
+        validated = []
+        for row in analysis["validated"]["variables"]:
+            if row.get("status") != "validated":
+                continue
+            table_names = ", ".join(match["table_name"] for match in row.get("matches", [])[:3])
+            if table_names:
+                validated.append(f"{row['variable']} ({table_names})")
+            else:
+                validated.append(row["variable"])
         if validated:
             source = analysis.get("evidence_source", "")
             location = {
@@ -803,6 +892,9 @@ def build_markdown_report(analysis: dict[str, Any]) -> str:
         "",
         "## Query",
         analysis["query"],
+        "",
+        "## Generated At",
+        analysis["generated_at"],
         "",
         "## Summary",
         analysis["summary"],
@@ -842,11 +934,19 @@ def build_markdown_report(analysis: dict[str, Any]) -> str:
     lines.extend(["", "## Validated Variables"])
     if analysis["validated"]["variables"]:
         for row in analysis["validated"]["variables"]:
-            details = ", ".join(match["table_name"] for match in row.get("matches", [])[:4])
-            details_text = f" [{details}]" if details else ""
-            lines.append(f"- {row['variable']}: {row['status']}{details_text}")
+            if row.get("matches"):
+                lines.append(f"- {row['variable']}: {row['status']}")
+                for match in row.get("matches", [])[:8]:
+                    label = f" | {match['description']}" if match.get("description") else ""
+                    component = f" | {match['component']}" if match.get("component") else ""
+                    cycle = f" | {match['cycle']}" if match.get("cycle") else ""
+                    lines.append(f"  - {match['table_name']}{cycle}{component}{label}")
+            else:
+                lines.append(f"- {row['variable']}: {row['status']}")
     else:
         lines.append("- None found")
+
+    lines.extend(["", "## Structured Summary", "```json", json.dumps(analysis["structured_summary"], indent=2), "```"])
 
     lines.extend(["", "## Notes"])
     notes = list(analysis.get("interpretation_notes", []))
@@ -981,6 +1081,41 @@ def run_nhanes_extraction_query(
         )
         selected_metadata_variables = normalize_candidate_selection(selection_payload)
 
+    allowed_table_names = {
+        item["table_name"]
+        for item in selected_metadata_variables
+        if item.get("table_name")
+    }
+    allowed_table_cycle_pairs = {
+        (item["table_name"], item["cycle"])
+        for item in selected_metadata_variables
+        if item.get("table_name") and item.get("cycle")
+    }
+    allowed_cycles = {
+        cycle
+        for row in cycles
+        if row.get("status") == "validated"
+        for cycle in row.get("canonical_cycles", [])
+    }
+
+    variable_codes_for_validation = sorted(
+        {
+            item["variable_name"]
+            for item in selected_metadata_variables
+            if item.get("variable_name")
+        }
+    ) if intent == "variable_identification" else sorted(
+        {
+            item["variable"]
+            for item in variable_mentions
+        }
+        | {
+            item["variable_name"]
+            for item in selected_metadata_variables
+            if item.get("variable_name")
+        }
+    )
+
     with connect_database(base_dir=base_dir) as conn, conn.cursor() as cur:
         validated_tables = validate_tables(
             cur,
@@ -998,20 +1133,19 @@ def run_nhanes_extraction_query(
         )
         validated_variables = validate_variables(
             cur,
-            sorted(
-                {
-                    item["variable"]
-                    for item in variable_mentions
-                }
-                | {
-                    item["variable_name"]
-                    for item in selected_metadata_variables
-                    if item.get("variable_name")
-                }
-            ),
+            variable_codes_for_validation,
+            allowed_tables=allowed_table_names or None,
+            allowed_cycles=allowed_cycles or None,
+            allowed_table_cycle_pairs=allowed_table_cycle_pairs or None,
         )
 
     interpretation_notes = [str(item).strip() for item in llm_payload.get("notes", []) if str(item).strip()]
+    if intent == "variable_identification":
+        selected_codes = {item["variable_name"] for item in selected_metadata_variables if item.get("variable_name")}
+        for item in variable_mentions:
+            raw_name = str(item.get("variable", "")).strip()
+            if raw_name and raw_name not in selected_codes:
+                interpretation_notes.append(f"Unresolved paper-level variable mention: {raw_name}")
     for row in cycles:
         if row["status"] != "validated":
             interpretation_notes.append(f"Unvalidated cycle mention: {row.get('raw', '')}")
@@ -1075,6 +1209,7 @@ def run_nhanes_extraction_query(
         validated_variables,
         component_mentions,
     )
+    analysis["structured_summary"] = build_structured_summary(analysis)
     analysis["summary"] = build_summary(analysis)
     analysis["quick_answer"] = analysis["summary"]
 
@@ -1090,7 +1225,7 @@ def run_nhanes_extraction_query(
             "kind": "nhanes_extraction",
             "created_at": analysis["generated_at"],
             "query": query.strip(),
-            "summary": analysis["summary"],
+            "summary": json.dumps(analysis["structured_summary"], separators=(",", ":")),
             "markdown_path": str(paths.markdown_path),
             "json_path": str(paths.json_path),
         }
