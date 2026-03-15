@@ -152,6 +152,10 @@
                 rows="6"
                 placeholder="Ask questions about a paper, send selected chunks, or request an R analysis plan..."
               ></textarea>
+              <div class="output-mode-toggle" role="group" aria-label="Response mode">
+                <button type="button" class="mode-chip active" id="mode-quick-view">Quick View</button>
+                <button type="button" class="mode-chip" id="mode-save-output">Save As Output</button>
+              </div>
               <div class="prompt-actions">
                 <button type="button" class="secondary-button" id="inject-context">
                   Insert selected chunks
@@ -167,8 +171,8 @@
         <div class="right-column">
           <section class="panel output-panel">
             <div class="panel-heading">
-              <h2>Status</h2>
-              <span class="section-label">Paper indexing</span>
+              <h2>Outputs</h2>
+              <span class="section-label">Generated documents</span>
             </div>
 
             <div class="action-panel-scroll">
@@ -190,6 +194,16 @@
                 <p class="section-label">No paper selected</p>
                 <h3>Select a paper on the left</h3>
                 <p>The selected paper's indexing details will appear here.</p>
+              </article>
+
+              <article class="output-documents-card">
+                <div>
+                  <p class="section-label">Output documents</p>
+                  <h3>Saved reports</h3>
+                </div>
+                <div class="output-documents-list" id="output-documents-list">
+                  <p class="status-log-empty">No output documents yet.</p>
+                </div>
               </article>
 
               <article class="status-log-card">

@@ -4,6 +4,13 @@ Browser-based workspace for uploading papers, chunking them into structured asse
 
 This project is designed to work well alongside the local [phonto](https://github.com/epiconnector/phonto) package for NHANES-side R access and analysis.
 
+It now also includes a local NHANES extraction workflow that:
+
+- retrieves relevant chunk text from the selected paper without sending content off-machine
+- extracts NHANES cycle, table, variable, and component mentions
+- validates those mentions against the local `NhanesLandingZone` metadata tables
+- writes strict Markdown and JSON output documents into each paper's `outputs/` directory
+
 ## Main Files
 
 - `index.html`, `styles.css`, `app.js`: browser UI
@@ -13,6 +20,10 @@ This project is designed to work well alongside the local [phonto](https://githu
 - `rag_store.py`: Postgres schema creation, indexing, and retrieval
 - `rag_config.py`: DB and embedding runtime config
 - `embedding_client.py`: OpenAI-compatible embeddings client
+- `nhanes_metadata_index.py`: vector-backed NHANES metadata index over `Metadata.QuestionnaireVariables`
+- `local_retrieval.py`: local chunk retrieval without embedding calls
+- `legacy_nhanes_agent.py`: current local NHANES extraction, validation, orchestration, and output writing used by the browser UI
+- `nhanes_agent/`: new FastAPI package scaffold for ingestion, retrieval, validation, and structured query answers
 - `init_rag_db.py`, `index_rag.py`, `search_rag.py`: RAG CLI tools
 
 ## Install
@@ -20,6 +31,7 @@ This project is designed to work well alongside the local [phonto](https://githu
 ```bash
 python3 -m pip install -r requirements-pdf-tools.txt
 python3 -m pip install -r requirements-rag.txt
+python3 -m pip install -r requirements-nhanes-agent.txt
 ```
 
 ## Environment Variables
@@ -43,6 +55,8 @@ Notes:
 
 - `EPIMIND_PGDATABASE` should usually stay `NhanesLandingZone`
 - `EPIMIND_PGSCHEMA` should stay `epimind` so the paper/RAG tables remain separate from the NHANES tables
+
+The local NHANES extraction workflow uses these same Postgres settings to validate extracted variables and table names against `Metadata.QuestionnaireVariables`.
 
 ### Embeddings
 
@@ -106,16 +120,49 @@ From the command line:
 python3 index_rag.py "My Project" "cobaltpaper"
 ```
 
+## Build The NHANES Metadata Index
+
+This builds a separate pgvector-backed index over `Metadata.QuestionnaireVariables` so concept queries such as `cobalt`, `glycohemoglobin`, or `age in years at screening` can be matched to candidate NHANES variables before final validation.
+
+```bash
+python3 index_nhanes_metadata.py
+```
+
+Recommended query flow for variable questions:
+
+1. infer likely NHANES cycles from the paper evidence
+2. extract raw variable concepts from the paper with the LLM
+3. search the metadata index with those concepts, filtered by cycle/component when available
+4. let the LLM choose among DB-backed candidates
+5. validate the selected variable codes and tables against `Metadata.QuestionnaireVariables`
+
 ## Search The Vector Store
 
 ```bash
 python3 search_rag.py "What are the main exposure outcomes?" --project "My Project" --paper "cobaltpaper"
 ```
 
+## Run Local NHANES Extraction From The UI
+
+1. Open a project
+2. Select a paper
+3. Type a NHANES-oriented prompt in the middle console
+4. Press `Enter`
+
+The server will run a local workflow and create:
+
+- a Markdown report in `outputs/`
+- a JSON sidecar in `outputs/`
+- a new output tile in the right panel
+
 ## Project Storage
 
 Projects are stored under `~/.EpiMind/Projects/<project-slug>`.
 Each paper lives under `~/.EpiMind/Projects/<project-slug>/papers/<paper-slug>`.
+
+Each paper may also contain:
+
+- `outputs/` for generated Markdown and JSON documents
 
 When a paper is indexed into Postgres, `EpiconUI` also writes:
 
@@ -127,7 +174,11 @@ When a paper is indexed into Postgres, `EpiconUI` also writes:
 ## Additional Documentation
 
 - [Local Filesystem Layout](/Users/robert/Projects/Epiconnector/EpiconUI/documentation/local-filesystem.md)
+- [Architecture Overview](/Users/robert/Projects/Epiconnector/EpiconUI/documentation/architecture-overview.md)
+- [Runtime Flows](/Users/robert/Projects/Epiconnector/EpiconUI/documentation/runtime-flows.md)
+- [Module Map](/Users/robert/Projects/Epiconnector/EpiconUI/documentation/module-map.md)
 - [NhanesLandingZone / epimind Schema](/Users/robert/Projects/Epiconnector/EpiconUI/documentation/nhaneslandingzone-schema.md)
 - [Database Checks And SQL](/Users/robert/Projects/Epiconnector/EpiconUI/documentation/database-checks.md)
 - [R And dplyr Examples](/Users/robert/Projects/Epiconnector/EpiconUI/documentation/r-dplyr-access.md)
 - [phonto And DB Access](/Users/robert/Projects/Epiconnector/EpiconUI/documentation/phonto-db-access.md)
+- [NHANES Agent Backend README](/Users/robert/Projects/Epiconnector/EpiconUI/nhanes_agent/README.md)

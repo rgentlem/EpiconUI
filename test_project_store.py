@@ -24,6 +24,7 @@ class ProjectStoreTests(unittest.TestCase):
             self.assertEqual(paper.paper_slug, "cohort-study")
             self.assertTrue(paper.paper_dir.exists())
             self.assertTrue(paper.chunks_dir.exists())
+            self.assertTrue(paper.outputs_dir.exists())
             self.assertEqual(paper.source_pdf_path.name, "cohort-study.pdf")
 
     def test_list_projects_returns_created_projects(self) -> None:

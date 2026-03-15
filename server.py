@@ -78,6 +78,21 @@ def paper_record(project_name: str, paper_slug: str, base_dir: str | Path | None
     return None
 
 
+def output_record(
+    project_name: str,
+    paper_slug: str,
+    output_id: str,
+    base_dir: str | Path | None = None,
+) -> tuple[dict | None, dict | None]:
+    paper = paper_record(project_name, paper_slug, base_dir=base_dir)
+    if not paper:
+        return None, None
+    for item in paper.get("outputs", []):
+        if item.get("output_id") == output_id:
+            return paper, item
+    return paper, None
+
+
 def run_paper_action(action: str, project_name: str, paper_slug: str, base_dir: str | Path | None = None) -> dict:
     normalized = action.strip().lower()
     if normalized == "index_rag":
@@ -145,6 +160,10 @@ class EpiMindHandler(SimpleHTTPRequestHandler):
             self.send_json(llm_config_summary(self.base_dir))
             return
 
+        if parsed.path == "/api/output-file":
+            self.handle_output_file(parsed.query)
+            return
+
         if parsed.path == "/":
             self.path = "/index.html"
         super().do_GET()
@@ -165,6 +184,10 @@ class EpiMindHandler(SimpleHTTPRequestHandler):
 
         if parsed.path == "/api/chat":
             self.handle_chat()
+            return
+
+        if parsed.path == "/api/agent/query":
+            self.handle_agent_query()
             return
 
         if parsed.path == "/api/paper-actions":
@@ -266,6 +289,50 @@ class EpiMindHandler(SimpleHTTPRequestHandler):
             }
         )
 
+    def handle_agent_query(self) -> None:
+        payload = self.read_json_body()
+        message = str(payload.get("message", "")).strip()
+        project_name = str(payload.get("project_name", "")).strip()
+        paper_slug = str(payload.get("paper_slug", "")).strip()
+        save_output = bool(payload.get("save_output", True))
+
+        if not message:
+            self.send_json({"error": "Message is required."}, status=HTTPStatus.BAD_REQUEST)
+            return
+        if not project_name:
+            self.send_json({"error": "Project name is required."}, status=HTTPStatus.BAD_REQUEST)
+            return
+        if not paper_slug:
+            self.send_json({"error": "Paper slug is required."}, status=HTTPStatus.BAD_REQUEST)
+            return
+
+        try:
+            from nhanes_agent import run_nhanes_extraction_query
+
+            result = run_nhanes_extraction_query(
+                project_name,
+                paper_slug,
+                message,
+                base_dir=self.base_dir,
+                save_output=save_output,
+            )
+        except ValueError as exc:
+            self.send_json({"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
+            return
+        except Exception as exc:
+            self.send_json({"error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+
+        refreshed = project_payload(project_name, base_dir=self.base_dir)
+        self.send_json(
+            {
+                **result,
+                "project": refreshed["project"],
+                "papers": refreshed["papers"],
+                "paper": paper_record(project_name, paper_slug, base_dir=self.base_dir),
+            }
+        )
+
     def handle_paper_action(self) -> None:
         payload = self.read_json_body()
         action = str(payload.get("action", "")).strip()
@@ -363,6 +430,38 @@ class EpiMindHandler(SimpleHTTPRequestHandler):
         finally:
             if temp_dir is not None:
                 temp_dir.cleanup()
+
+    def handle_output_file(self, query_string: str) -> None:
+        query = parse_qs(query_string)
+        project_name = (query.get("project_name") or [""])[0].strip()
+        paper_slug = (query.get("paper_slug") or [""])[0].strip()
+        output_id = (query.get("output_id") or [""])[0].strip()
+        output_format = (query.get("format") or ["markdown"])[0].strip().lower()
+
+        if not project_name or not paper_slug or not output_id:
+            self.send_json({"error": "project_name, paper_slug, and output_id are required."}, status=HTTPStatus.BAD_REQUEST)
+            return
+
+        paper, record = output_record(project_name, paper_slug, output_id, base_dir=self.base_dir)
+        if not paper or not record:
+            self.send_json({"error": "Output not found."}, status=HTTPStatus.NOT_FOUND)
+            return
+
+        file_key = "json_path" if output_format == "json" else "markdown_path"
+        path = Path(str(record.get(file_key) or ""))
+        if not path.exists():
+            self.send_json({"error": "Output file is missing."}, status=HTTPStatus.NOT_FOUND)
+            return
+
+        content = path.read_bytes()
+        self.send_response(HTTPStatus.OK)
+        if output_format == "json":
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+        else:
+            self.send_header("Content-Type", "text/markdown; charset=utf-8")
+        self.send_header("Content-Length", str(len(content)))
+        self.end_headers()
+        self.wfile.write(content)
 
     def send_json(self, payload: dict, status: HTTPStatus = HTTPStatus.OK) -> None:
         encoded = json.dumps(payload).encode("utf-8")

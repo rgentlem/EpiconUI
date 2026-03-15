@@ -32,6 +32,7 @@ class PaperPaths:
     captions_dir: Path
     figures_dir: Path
     tables_dir: Path
+    outputs_dir: Path
     metadata_dir: Path
     metadata_path: Path
 
@@ -133,6 +134,7 @@ def ensure_paper_paths(project: ProjectPaths, pdf_path: str | Path) -> PaperPath
     captions_dir = root_dir / "captions"
     figures_dir = root_dir / "figures"
     tables_dir = root_dir / "tables"
+    outputs_dir = root_dir / "outputs"
     metadata_dir = root_dir / "metadata"
     metadata_path = root_dir / "paper.json"
     source_pdf_path = paper_dir / pdf_source.name
@@ -144,6 +146,7 @@ def ensure_paper_paths(project: ProjectPaths, pdf_path: str | Path) -> PaperPath
         captions_dir,
         figures_dir,
         tables_dir,
+        outputs_dir,
         metadata_dir,
     ):
         directory.mkdir(parents=True, exist_ok=True)
@@ -159,6 +162,7 @@ def ensure_paper_paths(project: ProjectPaths, pdf_path: str | Path) -> PaperPath
         captions_dir=captions_dir,
         figures_dir=figures_dir,
         tables_dir=tables_dir,
+        outputs_dir=outputs_dir,
         metadata_dir=metadata_dir,
         metadata_path=metadata_path,
     )
@@ -205,12 +209,14 @@ def ingest_pdf_to_project(
         "captions_dir": str(paper_paths.captions_dir),
         "figures_dir": str(paper_paths.figures_dir),
         "tables_dir": str(paper_paths.tables_dir),
+        "outputs_dir": str(paper_paths.outputs_dir),
         "metadata_dir": str(paper_paths.metadata_dir),
         "metadata_path": str(paper_paths.metadata_path),
         "manifest_path": str(paper_paths.root_dir / "manifest.json"),
         "ingested_at": now_iso(),
         "manifest": extraction_manifest,
         "rag": {},
+        "outputs": [],
     }
     write_json(paper_paths.metadata_path, paper_record)
     sync_project_index(project, paper_record)
@@ -236,10 +242,12 @@ def ingest_pdf_to_project(
             "captions_dir": str(paper_paths.captions_dir),
             "figures_dir": str(paper_paths.figures_dir),
             "tables_dir": str(paper_paths.tables_dir),
+            "outputs_dir": str(paper_paths.outputs_dir),
             "metadata_dir": str(paper_paths.metadata_dir),
             "metadata_path": str(paper_paths.metadata_path),
             "manifest_path": str(paper_paths.root_dir / "manifest.json"),
             "rag": {},
+            "outputs": [],
         },
         "manifest": extraction_manifest,
     }

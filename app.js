@@ -1,6 +1,8 @@
 const promptInput = document.querySelector("#prompt");
 const injectButton = document.querySelector("#inject-context");
 const sendButton = document.querySelector("#send-prompt");
+const modeQuickViewButton = document.querySelector("#mode-quick-view");
+const modeSaveOutputButton = document.querySelector("#mode-save-output");
 const chatThread = document.querySelector(".chat-thread");
 const promptForm = document.querySelector("#prompt-form");
 const projectForm = document.querySelector("#project-form");
@@ -16,6 +18,7 @@ const projectStatus = document.querySelector("#project-status");
 const paperActionSummary = document.querySelector("#paper-action-summary");
 const paperActionStatusHero = document.querySelector("#paper-action-status-hero");
 const paperActionStatus = document.querySelector("#paper-action-status");
+const outputDocumentsList = document.querySelector("#output-documents-list");
 const statusLogList = document.querySelector("#status-log-list");
 const llmConfigForm = document.querySelector("#llm-config-form");
 const llmBaseUrlInput = document.querySelector("#llm-base-url");
@@ -42,6 +45,7 @@ const appState = {
   llmConfigured: false,
   llmEditorOpen: true,
   projectCatalog: [],
+  promptMode: "quick_view",
 };
 
 function slugify(value) {
@@ -75,9 +79,11 @@ function buildPaperRecord(fileName) {
     captionsPath: `${paperRoot}/captions/captions.json`,
     figuresPath: `${paperRoot}/figures`,
     tablesPath: `${paperRoot}/tables`,
+    outputsPath: `${paperRoot}/outputs`,
     manifestPath: `${paperRoot}/manifest.json`,
     uploadedAt: new Date().toLocaleString(),
     rag: {},
+    outputs: [],
   };
 }
 
@@ -142,9 +148,11 @@ function normalizePaperRecord(record) {
     captionsPath: manifest.captions_json || record.captions_dir,
     figuresPath: record.figures_dir,
     tablesPath: record.tables_dir,
+    outputsPath: record.outputs_dir,
     manifestPath: `${record.paper_dir}/manifest.json`,
     uploadedAt: record.ingested_at || "Available",
     rag: record.rag || {},
+    outputs: record.outputs || [],
   };
 }
 
@@ -225,8 +233,20 @@ async function clearLlmConfig() {
   return body;
 }
 
-async function sendPrompt(message) {
-  const response = await fetch("/api/chat", {
+function renderPromptMode() {
+  if (modeQuickViewButton) {
+    modeQuickViewButton.classList.toggle("active", appState.promptMode === "quick_view");
+  }
+  if (modeSaveOutputButton) {
+    modeSaveOutputButton.classList.toggle("active", appState.promptMode === "save_output");
+  }
+  if (sendButton) {
+    sendButton.textContent = appState.promptMode === "quick_view" ? "Send to model" : "Save As Output";
+  }
+}
+
+async function sendPrompt(message, saveOutput) {
+  const response = await fetch("/api/agent/query", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -235,12 +255,13 @@ async function sendPrompt(message) {
       message,
       project_name: appState.projectName,
       paper_slug: appState.selectedPaperId,
+      save_output: saveOutput,
     }),
   });
 
   const payload = await response.json();
   if (!response.ok) {
-    throw new Error(payload.error || "Chat request failed.");
+    throw new Error(payload.error || "Agent query failed.");
   }
   return payload;
 }
@@ -369,7 +390,7 @@ function runIndexSelectedPaper() {
 }
 
 function renderPaperActionPanel() {
-  if (!paperActionSummary || !paperActionStatusHero || !paperActionStatus || !statusLogList) {
+  if (!paperActionSummary || !paperActionStatusHero || !paperActionStatus || !outputDocumentsList || !statusLogList) {
     return;
   }
 
@@ -386,6 +407,7 @@ function renderPaperActionPanel() {
       <p>Choose a paper to see indexing state.</p>
     `;
     paperActionStatus.textContent = "Choose a paper to enable actions.";
+    outputDocumentsList.innerHTML = '<p class="status-log-empty">No output documents yet.</p>';
     statusLogList.innerHTML = '<p class="status-log-empty">No actions yet.</p>';
     return;
   }
@@ -413,6 +435,10 @@ function renderPaperActionPanel() {
         <span class="section-label">Last indexed</span>
         <strong>${rag.indexed_at || "Not yet run"}</strong>
       </div>
+      <div class="action-meta-item">
+        <span class="section-label">Output docs</span>
+        <strong>${paper.outputs?.length || 0}</strong>
+      </div>
     </div>
   `;
   paperActionStatusHero.innerHTML = `
@@ -434,6 +460,36 @@ function renderPaperActionPanel() {
       appState.paperActionStatusMessage ||
       (indexed ? `Vector index ready for ${paper.paperName}.` : `Vector index not created yet for ${paper.paperName}.`);
   }
+
+  outputDocumentsList.innerHTML = (paper.outputs || []).length
+    ? paper.outputs
+        .map((item) => {
+          const markdownHref = `/api/output-file?${new URLSearchParams({
+            project_name: appState.projectName,
+            paper_slug: paper.paperSlug,
+            output_id: item.output_id,
+            format: "markdown",
+          }).toString()}`;
+          const jsonHref = `/api/output-file?${new URLSearchParams({
+            project_name: appState.projectName,
+            paper_slug: paper.paperSlug,
+            output_id: item.output_id,
+            format: "json",
+          }).toString()}`;
+          return `
+            <article class="output-document-item">
+              <p class="section-label">${String(item.kind || "output").replace(/_/g, " ")}</p>
+              <h4>${item.title}</h4>
+              <p>${item.summary || "Generated output document."}</p>
+              <div class="output-document-links">
+                <a href="${markdownHref}" target="_blank" rel="noreferrer">Markdown</a>
+                <a href="${jsonHref}" target="_blank" rel="noreferrer">JSON</a>
+              </div>
+            </article>
+          `;
+        })
+        .join("")
+    : '<p class="status-log-empty">No output documents yet.</p>';
 
   const visibleEntries = appState.statusLog.filter((entry) => !entry.paperSlug || entry.paperSlug === paper.id).slice(0, 6);
   statusLogList.innerHTML = visibleEntries.length
@@ -555,6 +611,10 @@ function renderPaperDetail() {
         <code>chunks/</code>
       </div>
       <div class="paper-path-item">
+        <span class="section-label">Directory</span>
+        <code>outputs/</code>
+      </div>
+      <div class="paper-path-item">
         <span class="section-label">File</span>
         <code>manifest.json</code>
       </div>
@@ -603,22 +663,61 @@ promptForm?.addEventListener("submit", (event) => {
     promptInput.focus();
     return;
   }
+  if (!appState.projectName || !appState.selectedPaperId) {
+    appendMessage("system", "Open a project and select a paper before running NHANES extraction.");
+    return;
+  }
 
   appendMessage("user", prompt);
   promptInput.value = "";
   sendButton.disabled = true;
-  sendPrompt(prompt)
+  const saveOutput = appState.promptMode === "save_output";
+  appState.paperActionStatusMessage = saveOutput
+    ? "Running NHANES workflow and writing output document..."
+    : "Running NHANES workflow in quick view mode...";
+  addStatusLog(`Started NHANES extraction for ${selectedPaper()?.paperName || "selected paper"}.`, "running", appState.selectedPaperId);
+  renderPaperDetail();
+  renderPaperActionPanel();
+  sendPrompt(prompt, saveOutput)
     .then((payload) => {
-      appendMessage("assistant", payload.answer);
-      setLlmStatus(`Response received from ${payload.model}.`);
+      syncProjectPayload(payload);
+      appState.selectedPaperId = payload.paper?.paper_slug || appState.selectedPaperId;
+      if (saveOutput && payload.output) {
+        appState.paperActionStatusMessage = `Created ${payload.output.title}.`;
+        appendMessage("assistant", `Saved output document: ${payload.output.title}\n\n${payload.output.summary}`);
+        addStatusLog(`Created output ${payload.output.title}.`, "success", payload.paper?.paper_slug || appState.selectedPaperId);
+      } else {
+        appState.paperActionStatusMessage = "Quick view response ready.";
+        appendMessage("assistant", payload.quick_answer || payload.answer);
+        addStatusLog(`Returned quick view response for ${payload.paper?.paper_name || "selected paper"}.`, "success", payload.paper?.paper_slug || appState.selectedPaperId);
+      }
+      renderProjectSummary();
+      renderPaperTiles();
+      renderPaperDetail();
+      renderPaperActionPanel();
+      setLlmStatus(saveOutput ? "Saved output document created." : "Quick view response ready.");
     })
     .catch((error) => {
       appendMessage("system", error.message);
+      appState.paperActionStatusMessage = error.message;
+      addStatusLog(`NHANES extraction failed: ${error.message}`, "error", appState.selectedPaperId);
+      renderPaperDetail();
+      renderPaperActionPanel();
       setLlmStatus(error.message, true);
     })
     .finally(() => {
       sendButton.disabled = false;
     });
+});
+
+modeQuickViewButton?.addEventListener("click", () => {
+  appState.promptMode = "quick_view";
+  renderPromptMode();
+});
+
+modeSaveOutputButton?.addEventListener("click", () => {
+  appState.promptMode = "save_output";
+  renderPromptMode();
 });
 
 promptInput?.addEventListener("keydown", (event) => {
@@ -778,6 +877,7 @@ fetchProjects()
 renderPaperTiles();
 renderPaperDetail();
 renderPaperActionPanel();
+renderPromptMode();
 setStatus("Start the local backend and create a project.");
 fetchLlmConfig()
   .then((payload) => {
